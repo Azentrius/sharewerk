@@ -1,0 +1,38 @@
+# Dependabot version updates for the Python packages, the base image and the GitHub Actions in
+# .github/workflows. The downloaders (gallery-dl, yt-dlp) are deliberately unpinned upwards in
+# requirements.txt; the image build always takes their newest release.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    groups:
+      pip:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    ignore:
+      # The Python version follows the one the tests run on (.github/workflows); raise both together.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

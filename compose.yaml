@@ -1,0 +1,33 @@
+# Start with: docker compose up -d
+# Prebuilt image from GitHub (rebuilt weekly with the newest downloaders).
+# To build locally instead: docker compose up -d --build
+services:
+  sharewerk:
+    image: ghcr.io/azentrius/sharewerk:latest
+    build: .
+    container_name: sharewerk
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Only reachable from this machine. Put a TLS reverse proxy in front.
+      # If your proxy runs on another host, bind to a private address instead,
+      # e.g. "10.0.0.5:8080:8080", and never expose the port publicly.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - sharewerk-data:/data
+      - ./secrets:/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 3g
+
+volumes:
+  sharewerk-data:

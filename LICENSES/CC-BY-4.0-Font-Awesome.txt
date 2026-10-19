@@ -1,0 +1,17 @@
+Font Awesome Free 5.15.4 - icons
+
+Icons by Fonticons, Inc. (https://fontawesome.com), as shipped in
+@patternfly/react-icons 6.4.0 (Red Hat, Inc.).
+
+Used in Sharewerk for every icon in app/static/icons.js except "pending",
+which is a PatternFly icon (see MIT-PatternFly-Icons.txt).
+
+Changes: the path data is unchanged. The icons are embedded as inline SVG
+paths and drawn in the current text colour.
+
+Licensed under the Creative Commons Attribution 4.0 International License
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Font Awesome Free license overview: https://fontawesome.com/license/free
+(Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)

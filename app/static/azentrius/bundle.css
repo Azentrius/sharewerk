@@ -1,0 +1,424 @@
+/* Azentrius: Komponenten
+   Reine CSS-Klassen ohne Build-Schritt. Alle Farben, Abstände und Radien kommen aus tokens.css.
+   In Cockpit-Addons wird dieselbe Datei geladen; das Dunkel-Thema schaltet dort .pf-v6-theme-dark
+   (siehe Abschnitt „Cockpit-Addons“). */
+
+/* ---------- Schriftwelt je Thema ---------- */
+:root {
+  --az-font-ui: var(--font-text);
+  --az-font-head: var(--font-display);
+  --az-font-code: var(--font-mono);
+}
+[data-theme^="azentrius"] {
+  --az-font-ui: var(--font-app);
+  --az-font-head: var(--font-app);
+}
+
+/* ---------- Grundlage ---------- */
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text);
+  font-family: var(--az-font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+[data-theme^="azentrius"] body { font-size: 15px; }
+a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+a:hover { color: var(--link-hover); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+code, .az-mono { font-family: var(--az-font-code); font-size: 0.875rem; }
+.az-icon { display: inline-block; inline-size: 1em; block-size: 1em; flex: none; vertical-align: -0.125em; fill: currentColor; }
+
+/* ---------- Seite ---------- */
+.az-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  box-sizing: border-box;
+}
+/* Seitenkopf: eine Zeile mit Titel links, Stand und „Aktualisieren“ rechts, darunter eine Linie. */
+.az-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  padding-block-end: 14px;
+  border-block-end: 1px solid var(--line);
+}
+.az-page-header > :first-child { min-width: 0; }
+.az-page-title {
+  margin: 0;
+  font-family: var(--az-font-head);
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+/* Namenszusatz wie „Monitor“ oder „AI“: Markenschrift kursiv in der Signaturfarbe. */
+.az-page-title__suffix { font-family: var(--font-brand); font-style: italic; font-weight: 400; color: var(--signature); }
+/* Name ohne Zusatz wie „Cron Jobs“: der Punkt der Wortmarke in der Signaturfarbe. */
+.az-page-title--dot::after { content: "."; color: var(--signature); }
+.az-page-desc { margin: var(--space-xs) 0 0; color: var(--text-subtle); max-width: 65ch; }
+.az-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
+.az-meta { color: var(--text-subtle); font-size: 12px; }
+
+/* ---------- Reiter ---------- */
+.az-tabs { display: flex; flex-wrap: wrap; gap: var(--space-xs); border-block-end: 1px solid var(--line); }
+/* Direkt unter dem Seitenkopf: 12 px Abstand statt des Seitenabstands von 24 px. */
+.az-page-header + .az-tabs { margin-block-start: calc(var(--space-sm) + var(--space-xs) - var(--space-lg)); }
+.az-tab {
+  min-block-size: 44px;
+  margin-block-end: -1px;
+  padding: 10px 14px;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  background: transparent;
+  color: var(--text-subtle);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.az-tab:hover { color: var(--text); }
+.az-tab[aria-selected="true"] { color: var(--primary-text); border-block-end-color: var(--signature); }
+[role="tabpanel"][hidden] { display: none; }
+
+/* ---------- Button ---------- */
+.az-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-block-size: 37px;
+  padding: 7px var(--space-lg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.az-btn--primary { background: var(--primary); color: var(--on-primary); }
+.az-btn--primary:hover { background: var(--primary-hover); color: var(--on-primary); }
+.az-btn--secondary { border-color: var(--primary); color: var(--primary-text); }
+.az-btn--secondary:hover { border-color: var(--primary-hover); color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-hover); }
+.az-btn--danger { background: var(--status-danger); color: var(--on-danger); }
+.az-btn--danger:hover { box-shadow: inset 0 0 0 999px #00000014; }
+.az-btn--link { padding-inline: var(--space-sm); color: var(--link); }
+.az-btn--link:hover { color: var(--link-hover); text-decoration: underline; text-underline-offset: 2px; }
+.az-btn--link.az-btn--danger-text { color: var(--danger-text); }
+.az-btn--plain { padding-inline: var(--space-sm); min-inline-size: 37px; color: var(--text-subtle); }
+.az-btn--plain:hover { background: var(--bg-hover); color: var(--text); }
+.az-btn--sm { min-block-size: 29px; padding: 3px var(--space-md); }
+.az-btn--plain.az-btn--sm { padding-inline: 6px; min-inline-size: 29px; }
+.az-btn:disabled, .az-btn[aria-disabled="true"] {
+  background: var(--tint-neutral);
+  border-color: transparent;
+  color: var(--text-disabled);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.az-btn--link:disabled, .az-btn--plain:disabled { background: transparent; }
+
+/* ---------- Karte ---------- */
+.az-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+  min-width: 0;
+}
+.az-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  padding: var(--space-lg) var(--space-lg) 0;
+}
+.az-card__title {
+  margin: 0;
+  font-family: var(--az-font-head);
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.az-card__desc { margin: var(--space-xs) 0 0; color: var(--text-subtle); font-size: 14px; }
+.az-card__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.az-card__body { padding: var(--space-md) var(--space-lg) var(--space-lg); }
+.az-card__body--flush { padding: var(--space-sm) 0 var(--space-sm); }
+.az-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+/* ---------- Tabelle ---------- */
+/* position: relative, damit absolut positionierte Hilfen (.az-sr im Kopf, der versteckte thead der Stapelansicht)
+   in der scrollenden Hülle bleiben. Sonst verbreitern sie die Seite, sobald die Tabelle seitlich scrollt. */
+.az-table-wrap { position: relative; overflow-x: auto; }
+.az-table { inline-size: 100%; border-collapse: collapse; font-size: 14px; }
+.az-table th, .az-table td {
+  padding: var(--space-md);
+  text-align: start;
+  vertical-align: middle;
+  border-block-end: 1px solid var(--line);
+}
+.az-table th {
+  padding-block: var(--space-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.az-table th:first-child, .az-table td:first-child { padding-inline-start: var(--space-lg); }
+.az-table th:last-child, .az-table td:last-child { padding-inline-end: var(--space-lg); }
+.az-table tbody tr:last-child td { border-block-end: 0; }
+.az-table tbody tr:hover { background: var(--bg-hover); }
+.az-table .az-cell-sub { display: block; color: var(--text-subtle); font-size: 12px; }
+.az-table .az-cell-actions { inline-size: 1%; white-space: nowrap; text-align: end; }
+.az-table .az-cell-actions > * + * { margin-inline-start: var(--space-xs); }
+.az-table .az-mono { font-size: 13px; overflow-wrap: anywhere; }
+/* Kurze Spalten (Name, Datei, Benutzer, Zeitplan) brechen nie um; die lange Spalte (Befehl, Image) nimmt den Rest. */
+.az-table .az-nowrap { white-space: nowrap; }
+.az-table tr.is-off td:not(.az-cell-actions):not(.az-cell-toggle) { color: var(--text-disabled); }
+.az-table tr.is-off .az-cell-sub { color: var(--text-disabled); }
+
+/* Schmale Ansicht: jede Zeile wird ein Block aus Beschriftung und Wert (data-label je Zelle). */
+@media (max-width: 640px) {
+  .az-table--stack thead { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+  .az-table--stack, .az-table--stack tbody, .az-table--stack tr, .az-table--stack td { display: block; inline-size: 100%; box-sizing: border-box; }
+  .az-table--stack tr { padding: var(--space-sm) var(--space-md); border-block-end: 1px solid var(--line); }
+  .az-table--stack tbody tr:last-child { border-block-end: 0; }
+  .az-table--stack td, .az-table--stack td:first-child, .az-table--stack td:last-child {
+    display: flex; justify-content: space-between; gap: var(--space-md);
+    padding: var(--space-xs) 0; border: 0; text-align: end;
+  }
+  .az-table--stack td::before { content: attr(data-label); color: var(--text-subtle); font-size: 12px; font-weight: 600; text-align: start; flex: none; }
+  .az-table--stack td.az-cell-actions { inline-size: 100%; justify-content: flex-end; }
+  .az-table--stack td.az-cell-actions::before { content: none; }
+  .az-table--stack .az-nowrap { white-space: normal; }
+}
+
+/* Touch: unter 640 px ist jedes Bedienelement mindestens 44 px hoch. */
+@media (max-width: 640px) {
+  .az-btn, .az-btn--sm { min-block-size: 44px; }
+  .az-btn--plain, .az-btn--plain.az-btn--sm { min-inline-size: 44px; }
+  .az-switch { min-block-size: 44px; }
+}
+
+/* ---------- Label ---------- */
+.az-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--tint-neutral);
+  color: var(--on-tint-neutral);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.az-label--success { background: var(--tint-success); color: var(--on-tint-success); }
+.az-label--warning { background: var(--tint-warning); color: var(--on-tint-warning); }
+.az-label--danger  { background: var(--tint-danger);  color: var(--on-tint-danger); }
+.az-label--info    { background: var(--tint-info);    color: var(--on-tint-info); }
+.az-label--strong.az-label--success { background: var(--status-success); color: var(--on-success); }
+.az-label--strong.az-label--warning { background: var(--status-warning); color: var(--on-warning); }
+.az-label--strong.az-label--danger  { background: var(--status-danger);  color: var(--on-danger); }
+.az-label--strong.az-label--info    { background: var(--status-info);    color: var(--on-info); }
+
+/* ---------- Schalter ---------- */
+.az-switch { position: relative; display: inline-flex; align-items: center; gap: var(--space-sm); cursor: pointer; font-size: 14px; }
+.az-switch input { position: absolute; opacity: 0; inline-size: 1px; block-size: 1px; margin: 0; }
+.az-switch__track {
+  position: relative;
+  flex: none;
+  inline-size: 35px;
+  block-size: 21px;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-pill);
+  background: var(--bg-control);
+  box-sizing: border-box;
+  transition: background-color 120ms ease;
+}
+.az-switch__track::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 3.5px;
+  inset-inline-start: 3.5px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: var(--line-control);
+  transition: transform 120ms ease;
+}
+.az-switch input:checked + .az-switch__track { background: var(--primary); border-color: var(--primary); }
+.az-switch input:checked + .az-switch__track::before { background: var(--on-primary); transform: translateX(14px); }
+.az-switch input:focus-visible + .az-switch__track { outline: 2px solid var(--focus); outline-offset: 2px; }
+.az-switch input:disabled + .az-switch__track { opacity: .45; cursor: not-allowed; }
+.az-switch__label { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .az-switch__track, .az-switch__track::before { transition: none; } }
+
+/* ---------- Formularfeld ---------- */
+.az-field { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
+.az-field__label { font-size: 14px; font-weight: 600; }
+.az-field__label .az-required { color: var(--danger-text); margin-inline-start: 2px; }
+.az-input {
+  inline-size: 100%;
+  min-block-size: 36px;
+  padding: 6px var(--space-sm);
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-small);
+  background: var(--bg-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.az-input.az-mono { font-family: var(--az-font-code); }
+.az-input::placeholder { color: var(--text-subtle); }
+.az-input:hover { border-color: var(--primary); }
+.az-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; border-color: var(--focus); }
+.az-input[aria-invalid="true"] { border-color: var(--status-danger); box-shadow: inset 0 -1px 0 var(--status-danger); }
+.az-field__help { margin: 0; font-size: 12px; color: var(--text-subtle); }
+.az-field__error { margin: 0; display: flex; gap: var(--space-xs); align-items: center; font-size: 12px; color: var(--danger-text); }
+
+/* ---------- Dialog ---------- */
+.az-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+  background: var(--backdrop);
+}
+.az-backdrop[hidden] { display: none; }
+.az-backdrop--inline { position: relative; inset: auto; min-block-size: 100%; }
+.az-modal {
+  inline-size: min(100%, 560px);
+  max-block-size: calc(100% - 2 * var(--space-md));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-floating);
+  color: var(--text);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-lg);
+  overflow: auto;
+}
+.az-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); padding: var(--space-lg) var(--space-lg) var(--space-sm); }
+.az-modal__title { margin: 0; font-family: var(--az-font-head); font-size: 20px; line-height: 1.3; font-weight: 600; }
+.az-modal__body { display: flex; flex-direction: column; gap: var(--space-md); padding: var(--space-md) var(--space-lg) 0; }
+.az-modal__footer { display: flex; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-lg); }
+
+/* ---------- Hinweis ---------- */
+.az-alert {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-md);
+  border: 2px solid var(--status-info);
+  border-radius: var(--radius-medium);
+  background: var(--bg-card);
+  color: var(--text);
+}
+.az-alert__icon { color: var(--status-info); font-size: 16px; line-height: 21px; }
+.az-alert__title { margin: 0; font-size: 14px; font-weight: 600; }
+.az-alert__body { grid-column: 2; margin: 0; color: var(--text); }
+.az-alert__actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: var(--space-md); margin-block-start: var(--space-xs); }
+.az-alert--success { border-color: var(--status-success); }
+.az-alert--success .az-alert__icon { color: var(--status-success); }
+.az-alert--warning { border-color: var(--status-warning); }
+.az-alert--warning .az-alert__icon { color: var(--status-warning); }
+.az-alert--danger { border-color: var(--status-danger); }
+.az-alert--danger .az-alert__icon { color: var(--status-danger); }
+
+/* ---------- Leerer Zustand ---------- */
+.az-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+}
+.az-empty__icon { font-size: 48px; color: var(--text-subtle); margin-block-end: var(--space-sm); }
+.az-empty__title { margin: 0; font-family: var(--az-font-head); font-size: 20px; line-height: 1.3; font-weight: 600; text-wrap: balance; }
+.az-empty__body { margin: 0; max-width: 46ch; color: var(--text-subtle); }
+.az-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); margin-block-start: var(--space-md); }
+
+/* ---------- Bildvorschau ---------- */
+/* Vorschau der Bilder, die eine App erzeugt oder weitergibt. Nur zum Ansehen, nicht bedienbar. */
+.az-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-md) var(--space-sm);
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.az-thumb { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
+/* Hochformat 4:5, nie beschnitten; was nicht 4:5 ist, steht auf bg-control. */
+.az-thumb__image {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: contain;
+  box-sizing: border-box;
+  background: var(--bg-control);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+/* Beschriftung unter dem Bild, nie darauf: auf einem fremden Bild ist 4,5:1 nicht zu garantieren. */
+.az-thumb__caption { font-size: 12px; line-height: 1.5; color: var(--text-subtle); overflow-wrap: anywhere; }
+.az-thumb__number { color: var(--text); font-weight: 600; }
+
+/* ---------- Signatur ---------- */
+.az-signature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-md);
+  padding-block-start: var(--space-md);
+  border-block-start: 1px solid var(--line);
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+/* Wortmarke wie auf dem Cover: das Wort in Textfarbe, nur der Punkt in Gold. */
+.az-signature__mark {
+  font-family: var(--font-brand);
+  font-size: 16px;
+  line-height: 1.3;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.az-signature__mark::after { content: "."; color: var(--signature); }
+.az-signature__mark:hover { color: var(--text); text-decoration: none; }
+.az-signature__meta { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); }
+.az-signature__meta a { color: var(--text-subtle); }
+.az-signature__meta a:hover { color: var(--link-hover); }
+
+/* ---------- Projektseite ---------- */
+/* Haupt-Link (CTA) im Hero einer Projektseite: große Pille, ein Icon ist dort nicht Pflicht. */
+.az-btn--lg { min-block-size: 48px; padding-inline: 28px; font-size: 16px; }
+/* Kleine Zeile über einem Abschnittstitel, nur auf Projektseiten und Covern: die einzige Versalien-Ausnahme. */
+.az-eyebrow { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--signature); }
+
+/* ---------- Hilfen für die Vorschauen ---------- */
+.az-demo { padding: var(--space-lg); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); }
+.az-demo--col { flex-direction: column; align-items: stretch; }
+.az-sr { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

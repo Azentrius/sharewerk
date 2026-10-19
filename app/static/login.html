@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- Sharewerk · SPDX-License-Identifier: Apache-2.0 -->
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharewerk</title>
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f1ee">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0f">
+  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="icon" href="/static/icons/sharewerk-favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/icon-192.png" type="image/png" sizes="192x192">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/azentrius/tokens.css">
+  <link rel="stylesheet" href="/static/azentrius/bundle.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="az-page">
+  <header class="az-page-header">
+    <h1 class="az-page-title az-page-title--dot">Sharewerk</h1>
+  </header>
+  <main class="sw-view">
+    <section class="az-card" aria-labelledby="login-title">
+      <div class="az-card__header">
+        <div>
+          <h2 class="az-card__title" id="login-title">{{title}}</h2>
+          <p class="az-card__desc">{{desc}}</p>
+        </div>
+      </div>
+      <div class="az-card__body">
+        <form method="post" action="/login" class="sw-form">
+          <div class="az-field">
+            <label class="az-field__label" for="token">{{label}}</label>
+            <input class="az-input az-mono" id="token" name="token" type="password" autocomplete="current-password"
+                   spellcheck="false" required autofocus aria-describedby="token-help token-error" {{invalid}}>
+            <p class="az-field__help" id="token-help">{{help}}</p>
+            <p class="az-field__error" id="token-error" {{error_hidden}}><svg class="az-icon" viewBox="0 0 512 512" aria-hidden="true"><path d="M504 256c0 136.997-111.043 248-248 248S8 392.997 8 256C8 119.083 119.043 8 256 8s248 111.083 248 248zm-248 50c-25.405 0-46 20.595-46 46s20.595 46 46 46 46-20.595 46-46-20.595-46-46-46zm-43.673-165.346l7.418 136c.347 6.364 5.609 11.346 11.982 11.346h48.546c6.373 0 11.635-4.982 11.982-11.346l7.418-136c.375-6.874-5.098-12.654-11.982-12.654h-63.383c-6.884 0-12.356 5.78-11.981 12.654z"/></svg>{{error}}</p>
+          </div>
+          <input type="hidden" name="next" value="{{next}}">
+          <button class="az-btn az-btn--primary" type="submit">{{submit}}</button>
+        </form>
+      </div>
+    </section>
+  </main>
+  <footer class="az-signature">
+    <a class="az-signature__mark" href="https://azentrius.de">Azentrius</a>
+    <span class="az-signature__meta"><span>Sharewerk {{version}}</span><span>{{host}}</span><a href="https://github.com/Azentrius/sharewerk">{{source}}</a></span>
+  </footer>
+</div>
+</body>
+</html>

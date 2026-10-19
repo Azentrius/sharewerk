@@ -1,0 +1,5 @@
+# Check tools, pinned so CI checks the same way every time; Dependabot keeps them current.
+pytest==9.1.1
+ruff==0.17.1
+# only for scripts/app-icon-sharewerk.py
+shapely==2.2.0

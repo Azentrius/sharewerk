@@ -1,0 +1,58 @@
+Sharewerk
+Copyright 2026 Azentrius
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+The Sharewerk sign (app/static/icons/, built by scripts/app-icon-sharewerk.py), two stacked
+cards with an arrow and the dot of the Azentrius word mark, is a mark of Azentrius, as are the
+names Azentrius and Sharewerk. They are not licensed under the Apache License; all rights reserved.
+
+This project includes third-party material under its own license (texts in LICENSES/):
+
+Azentrius Design System (app/static/azentrius/tokens.css and bundle.css, copied unchanged)
+  Apache License 2.0, see LICENSES/Apache-2.0-Azentrius-Design-System.txt
+
+DM Sans (app/static/azentrius/fonts/DMSans-VF.woff2)
+  Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
+  SIL Open Font License 1.1, see LICENSES/OFL-DM-Sans.txt
+
+DM Serif Display (app/static/azentrius/fonts/DMSerifDisplay-Regular.woff2)
+  Copyright 2014 - 2017 Adobe Systems Incorporated (http://www.adobe.com/), with
+  Reserved Font Name 'Source'. Copyright 2019 Google LLC.
+  SIL Open Font License 1.1, see LICENSES/OFL-DM-Serif-Display.txt
+
+Red Hat Mono (app/static/azentrius/fonts/RedHatMono-VF.woff2)
+  Copyright 2024 The Red Hat Project Authors (https://github.com/RedHatOfficial/RedHatFont)
+  SIL Open Font License 1.1, see LICENSES/OFL-Red-Hat-Mono.txt
+
+Icons except "pending" (app/static/icons.js): Font Awesome Free 5.15.4 (Solid) by
+  Fonticons, Inc. (https://fontawesome.com), as shipped in @patternfly/react-icons 6.4.0
+  (Red Hat, Inc.); the path data is unchanged.
+  Creative Commons Attribution 4.0 International, see LICENSES/CC-BY-4.0-Font-Awesome.txt
+
+Icon "pending" (app/static/icons.js): PatternFly's own icon from @patternfly/react-icons
+  6.4.0; the path data is unchanged.
+  Copyright (c) 2019 Red Hat, Inc.
+  MIT License, see LICENSES/MIT-PatternFly-Icons.txt
+
+The Docker image additionally contains the following software, each under its own license.
+Sharewerk runs the downloaders and FFmpeg as separate programs and does not modify them.
+
+  gallery-dl          GPL-2.0-only                     https://github.com/mikf/gallery-dl
+  yt-dlp              Unlicense                        https://github.com/yt-dlp/yt-dlp
+  FFmpeg (Debian)     GPL-2.0-or-later (Debian build)  https://ffmpeg.org, https://packages.debian.org/ffmpeg
+  faster-whisper      MIT                              https://github.com/SYSTRAN/faster-whisper
+  CTranslate2         MIT                              https://github.com/OpenNMT/CTranslate2
+  FastAPI             MIT                              https://github.com/fastapi/fastapi
+  Uvicorn             BSD-3-Clause                     https://github.com/encode/uvicorn
+  HTTPX               BSD-3-Clause                     https://github.com/encode/httpx
+  Pillow              MIT-CMU                          https://github.com/python-pillow/Pillow
+  Python              PSF-2.0                          https://www.python.org
+
+The Whisper model weights (MIT, https://huggingface.co/Systran) are not part of the image;
+Sharewerk downloads them from Hugging Face on first use.
+
+The full license texts of the Python packages are in the image under
+/usr/local/lib/python3.13/site-packages/*/, those of the Debian packages under
+/usr/share/doc/*/copyright. The source code of the GPL components is available from the links
+above; for the exact versions in an image, run `pip show gallery-dl` or `dpkg -l ffmpeg` in the
+container.

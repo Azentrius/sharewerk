@@ -1,0 +1,111 @@
+# Tests, lint and the secret scan on every push and pull request. On main, and every week, the
+# image ghcr.io/azentrius/sharewerk:latest is rebuilt and pushed afterwards, so it always ships
+# the newest gallery-dl and yt-dlp.
+name: test
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly rebuild of latest with the newest downloaders.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/azentrius/sharewerk
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the secret scan reads the whole history
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null
+      - name: Install the dependencies and the pinned check tools
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (ruff, rules in ruff.toml)
+        run: ruff check
+      - name: Tests
+        run: python -m pytest -q
+      - name: Changelog section for the version in app/__init__.py
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/__init__.py)
+          tools/release-notes.sh "$version" > /dev/null || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+      - name: Secret scan of the whole history (gitleaks, rules in .gitleaks.toml)
+        # Same version as in .pre-commit-config.yaml; raise both together.
+        run: >
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git --redact --verbose --config /repo/.gitleaks.toml /repo
+      - name: Image builds and its tools run
+        run: |
+          docker build --pull --no-cache -t sharewerk:test .
+          docker run --rm sharewerk:test sh -c '
+            set -e
+            ffmpeg -hide_banner -version | head -n 1
+            gallery-dl --version
+            yt-dlp --version
+            python -c "import app.main, faster_whisper"
+          '
+
+  image:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: image-latest
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write     # push the image
+      id-token: write     # sign the build provenance
+      attestations: write # store the build provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=schedule,pattern={{date 'YYYYMMDD'}}
+            type=sha,format=short
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          pull: true
+          # No build cache on purpose: every build must fetch the newest downloaders.
+          no-cache: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Build provenance for the image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

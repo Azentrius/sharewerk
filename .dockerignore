@@ -1,0 +1,16 @@
+.git
+.github
+.env
+secrets
+data
+tests
+scripts
+tools
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.venv
+venv
+*.md
+!README.md

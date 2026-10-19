@@ -1,0 +1,178 @@
+<!doctype html>
+<!-- Sharewerk · SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sharewerk</title>
+  <meta name="description" content="Turn Instagram and Facebook posts into share-ready packs.">
+  <!-- bg-page of "Azentrius hell" / "Azentrius dunkel" -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f1ee">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0f">
+  <!-- use-credentials: lets Chrome fetch the manifest through an auth proxy (e.g. Pomerium) -->
+  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="icon" href="/static/icons/sharewerk-favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/icon-192.png" type="image/png" sizes="192x192">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/azentrius/tokens.css">
+  <link rel="stylesheet" href="/static/azentrius/bundle.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/icons.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="az-page">
+  <header class="az-page-header">
+    <h1 class="az-page-title az-page-title--dot">Sharewerk</h1>
+  </header>
+
+  <div id="page-alert" class="az-alert" hidden>
+    <span class="az-alert__icon"></span>
+    <p class="az-alert__title"></p>
+    <p class="az-alert__body"></p>
+  </div>
+
+  <!-- Start -->
+  <main id="view-home" class="sw-view" hidden>
+    <div id="install-alert" class="az-alert az-alert--info" role="status" hidden>
+      <span class="az-alert__icon" data-icon="info-circle"></span>
+      <p class="az-alert__title" data-i18n="home.installTitle"></p>
+      <p class="az-alert__body" data-i18n="home.installBody"></p>
+    </div>
+
+    <section class="az-card" aria-labelledby="link-title">
+      <div class="az-card__header">
+        <div>
+          <h2 class="az-card__title" id="link-title" data-i18n="home.title"></h2>
+          <p class="az-card__desc" data-i18n="home.desc"></p>
+        </div>
+      </div>
+      <div class="az-card__body">
+        <form id="link-form" class="sw-form" novalidate>
+          <div class="az-field">
+            <label class="az-field__label" for="link-input" data-i18n="home.label"></label>
+            <input class="az-input az-mono" id="link-input" type="url" inputmode="url"
+                   autocomplete="off" spellcheck="false" aria-describedby="link-help link-error">
+            <p class="az-field__help" id="link-help" data-i18n="home.help"></p>
+            <p class="az-field__error" id="link-error" hidden><span data-icon="exclamation-circle"></span><span id="link-error-text"></span></p>
+          </div>
+          <button class="az-btn az-btn--primary" type="submit" data-i18n="home.submit"></button>
+        </form>
+      </div>
+    </section>
+
+    <section id="recent-card" class="az-card" aria-labelledby="recent-title" hidden>
+      <div class="az-card__header">
+        <h2 class="az-card__title" id="recent-title" data-i18n="recent.title"></h2>
+      </div>
+      <div class="az-card__body--flush az-table-wrap">
+        <table class="az-table az-table--stack">
+          <thead>
+            <tr>
+              <th data-i18n="recent.post"></th>
+              <th data-i18n="recent.status"></th>
+              <th data-i18n="recent.time"></th>
+              <th><span class="az-sr" data-i18n="recent.actions"></span></th>
+            </tr>
+          </thead>
+          <tbody id="recent"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="recent-empty" class="az-card" hidden>
+      <div class="az-empty">
+        <span class="az-empty__icon" data-icon="history"></span>
+        <h2 class="az-empty__title" data-i18n="recent.emptyTitle"></h2>
+        <p class="az-empty__body" id="recent-empty-body"></p>
+      </div>
+    </section>
+  </main>
+
+  <!-- In progress -->
+  <main id="view-work" class="sw-view" hidden>
+    <section class="az-card" aria-labelledby="work-title" aria-live="polite">
+      <div class="az-card__header">
+        <div>
+          <h2 class="az-card__title" id="work-title" data-i18n="work.title"></h2>
+          <p class="az-card__desc az-mono" id="work-source"></p>
+        </div>
+      </div>
+      <div class="az-card__body sw-stack">
+        <p class="sw-progress"><span data-icon="pending"></span><span id="work-step"></span></p>
+        <p class="az-field__help" id="queue-info" hidden></p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Result -->
+  <main id="view-done" class="sw-view" hidden>
+    <section class="az-card" aria-labelledby="result-title">
+      <div class="az-card__header">
+        <div>
+          <h2 class="az-card__title" id="result-title"></h2>
+          <p class="az-card__desc" id="result-meta"></p>
+        </div>
+        <div class="az-card__actions">
+          <button class="az-btn az-btn--secondary az-btn--sm" id="btn-copy" type="button"><span data-icon="copy"></span><span data-i18n="done.copy"></span></button>
+        </div>
+      </div>
+      <div class="az-card__body sw-stack">
+        <p id="pack-summary"></p>
+        <button class="az-btn az-btn--primary" id="btn-share" type="button"><span data-icon="share-alt"></span><span class="sw-label" data-i18n="done.share"></span></button>
+        <ul class="sw-files" id="downloads" hidden></ul>
+        <ol class="az-thumbs" id="thumbs" hidden></ol>
+        <p><a id="result-link" href="#" target="_blank" rel="noopener noreferrer"><span data-i18n="done.open"></span> <span data-icon="external-link-alt"></span></a></p>
+      </div>
+    </section>
+
+    <section class="az-card" id="more-card" aria-labelledby="more-title" hidden>
+      <div class="az-card__header">
+        <div>
+          <h2 class="az-card__title" id="more-title" data-i18n="more.title"></h2>
+          <p class="az-card__desc" data-i18n="more.desc"></p>
+        </div>
+      </div>
+      <div class="az-card__body">
+        <div class="az-card__actions" id="more-actions"></div>
+      </div>
+    </section>
+
+    <section class="az-card" aria-labelledby="text-title">
+      <div class="az-card__header">
+        <h2 class="az-card__title" id="text-title" data-i18n="done.textTitle"></h2>
+      </div>
+      <div class="az-card__body">
+        <p class="sw-text" id="result-text"></p>
+      </div>
+    </section>
+
+    <div><button class="az-btn az-btn--link" id="btn-new" type="button" data-i18n="done.new"></button></div>
+  </main>
+
+  <!-- Error -->
+  <main id="view-error" class="sw-view" hidden>
+    <div class="az-alert az-alert--danger" role="alert">
+      <span class="az-alert__icon" data-icon="exclamation-circle"></span>
+      <p class="az-alert__title" id="error-title"></p>
+      <p class="az-alert__body" id="error-text"></p>
+      <p class="az-alert__body" id="error-source-line" hidden><span data-i18n="error.post"></span> <code id="error-source"></code></p>
+      <p class="az-alert__body" id="error-details-line" hidden><code id="error-details"></code></p>
+      <div class="az-alert__actions" id="error-actions">
+        <button class="az-btn az-btn--link az-btn--sm" id="btn-retry" type="button" data-i18n="error.retry"></button>
+      </div>
+    </div>
+    <div><button class="az-btn az-btn--link" id="btn-error-new" type="button" data-i18n="done.new"></button></div>
+  </main>
+
+  <footer class="az-signature">
+    <a class="az-signature__mark" href="https://azentrius.de">Azentrius</a>
+    <span class="az-signature__meta">
+      <span id="sig-product">Sharewerk</span>
+      <span id="sig-host"></span>
+      <a href="https://github.com/Azentrius/sharewerk" data-i18n="footer.source"></a>
+    </span>
+  </footer>
+</div>
+</body>
+</html>

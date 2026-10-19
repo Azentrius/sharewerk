@@ -1,0 +1,12 @@
+# Application libraries: pinned for reproducible builds.
+fastapi==0.148.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+pillow==13.0.0
+faster-whisper==1.2.1
+
+# Downloaders: deliberately unpinned upwards. Instagram and Facebook change
+# often, and only the latest releases keep working. Every image build pulls
+# the newest versions (CI rebuilds weekly).
+gallery-dl>=1.32.17
+yt-dlp>=2026.8.19

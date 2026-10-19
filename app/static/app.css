@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Sharewerk: only layout that the Azentrius Design System leaves to the app.
+   Colours, type, spacing, radii and components come from azentrius/tokens.css
+   and azentrius/bundle.css, which are copied unchanged. */
+
+[hidden] { display: none !important; }
+
+.sw-view { display: flex; flex-direction: column; gap: var(--space-lg); }
+
+.sw-form,
+.sw-stack { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+.sw-form .az-field { align-self: stretch; }
+
+.az-card__body p,
+.sw-stack p { margin: 0; }
+.az-card__desc { overflow-wrap: anywhere; }
+
+/* A running process: icon and text in text-subtle, no frame, no spinner. */
+.sw-progress { display: flex; align-items: center; gap: var(--space-sm); margin: 0; color: var(--text-subtle); }
+
+.sw-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.sw-files { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
+.sw-files a { overflow-wrap: anywhere; }
+
+.az-alert__body code { overflow-wrap: anywhere; }
+
+/* Link actions in an alert start flush with its text, as in the design system's Alert preview. */
+.az-alert__actions .az-btn--link { padding-inline: 0; }

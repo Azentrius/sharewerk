@@ -1,0 +1,11 @@
+# LF everywhere: the files run in a Linux container, whatever the checkout platform.
+* text=auto eol=lf
+
+*.png   binary
+*.woff2 binary
+
+# Not part of the source archive of a release (git archive): repository tooling only.
+/.github/                 export-ignore
+/.gitattributes           export-ignore
+/.gitignore               export-ignore
+/.pre-commit-config.yaml  export-ignore

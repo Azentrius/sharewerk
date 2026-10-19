@@ -1,0 +1,21 @@
+# Secret scanning for Sharewerk. Used by the pre-commit hook and by CI.
+# Default gitleaks rules plus two project-specific ones: exported browser
+# cookies (a leaked session cookie is a logged-in account) and a filled-in
+# access token.
+
+title = "Sharewerk gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "netscape-cookie-instagram-facebook"
+description = "Instagram/Facebook session cookie in Netscape cookies.txt format"
+regex = '''(?i)\.(instagram|facebook)\.com\s+(TRUE|FALSE)\s+\S+\s+(TRUE|FALSE)\s+\d+\s+(sessionid|ds_user_id|csrftoken|rur|c_user|xs|datr|fr|sb)\s+\S{6,}'''
+keywords = ["instagram.com", "facebook.com"]
+
+[[rules]]
+id = "sharewerk-auth-token"
+description = "Filled-in SHAREWERK_AUTH_TOKEN"
+regex = '''SHAREWERK_AUTH_TOKEN\s*[=:]\s*['"]?[A-Za-z0-9_\-]{16,}'''
+keywords = ["sharewerk_auth_token"]
