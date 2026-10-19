@@ -74,15 +74,16 @@ Instagram shows almost nothing to logged-out visitors, so the downloaders need t
 
 1. **Use a secondary account, not your main one.** Automated access violates Meta's terms of use, and accounts used this way can be rate-limited or blocked.
 2. Create a separate browser profile, log in to that account there, and do nothing else in that profile. This keeps the cookie file limited to that one account.
-3. Export the cookies in Netscape `cookies.txt` format, for example with the browser extension "Get cookies.txt LOCALLY" (Chrome) or "cookies.txt" (Firefox). Export instagram.com, and facebook.com if you want it.
+3. Export the cookies in Netscape `cookies.txt` format, for example with the browser extension "Get cookies.txt LOCALLY" (Chrome) or "cookies.txt" (Firefox). In Chrome, take the one with "LOCALLY" in its name: an older extension called "Get cookies.txt" was removed from the Chrome Web Store as malware. Export instagram.com, and facebook.com if you want it.
 4. Close the browser profile without logging out (logging out invalidates the cookies).
-5. Copy the file to the server and make it readable only by the container user (uid 10001):
+5. Copy the file to the server, put it in place so that only the container user (uid 10001) can read it, and delete the copy:
 
 ```bash
-cp ~/Downloads/cookies.txt secrets/cookies.txt
-sudo chown 10001 secrets/cookies.txt && chmod 600 secrets/cookies.txt
-docker compose restart sharewerk
+sudo install -o 10001 -g 10001 -m 600 cookies.txt secrets/cookies.txt
+shred -u cookies.txt
 ```
+
+Sharewerk reads the file again for every job, so there is no need to restart it. Delete the exported file on your computer as well.
 
 Cookies expire after a while, or sooner when Instagram gets suspicious. When Sharewerk reports "login required", export them again.
 
@@ -110,18 +111,26 @@ Only do this if the port is unreachable except through the proxy. Two things are
 - The share target uses `GET`, so the shared link survives a redirect to the proxy's login page and back.
 - The manifest is loaded with credentials (`crossorigin="use-credentials"`), so Chrome can install the app through the proxy. If your proxy still blocks it, make `/manifest.webmanifest`, `/sw.js` and `/static/*` public; they contain nothing private.
 
-Example Pomerium route:
+Example Pomerium routes, with a public health check for monitoring:
 
 ```yaml
 routes:
   - from: https://sharewerk.example.com
+    path: /health
+    prefix_rewrite: /healthz
     to: http://10.0.0.5:8080
+    allow_public_unauthenticated_access: true
+  - from: https://sharewerk.example.com
+    to: http://10.0.0.5:8080
+    timeout: 600s
     policy:
       - allow:
           or:
             - email:
                 is: you@example.com
 ```
+
+Sharewerk answers `GET /healthz` with `{"ok":true}`. Pomerium, however, answers `/healthz` and `/ping` itself, so a monitor on those paths only shows that Pomerium is up. The first route passes `/health` to Sharewerk's `/healthz` without a login; point your monitor there and check for `"ok":true`. Everything else stays behind the policy. Keep the public route first, because Pomerium uses the first route that matches. The longer `timeout` gives large files time to download over a slow connection; Pomerium's default is 30 seconds.
 
 ## Updating
 
