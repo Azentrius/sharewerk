@@ -142,7 +142,18 @@ docker compose pull && docker compose up -d
 
 If you build locally: `docker compose build --pull --no-cache && docker compose up -d`.
 
-Every release also gets its own image tag (`ghcr.io/azentrius/sharewerk:0.1.0`), which keeps the downloaders of its build day. Images carry a signed build provenance; check one with `gh attestation verify oci://ghcr.io/azentrius/sharewerk:latest --repo Azentrius/sharewerk`.
+Images carry a signed build provenance; check one with `gh attestation verify oci://ghcr.io/azentrius/sharewerk:latest --repo Azentrius/sharewerk`.
+
+### Image tags and labels
+
+| Tag | What it is |
+|---|---|
+| `latest` | The newest build of `main`, rebuilt on every change and every Monday with the newest downloaders. Use this one. |
+| `X.Y.Z` (e.g. `0.1.0`) | A release. It keeps the downloaders of its build day and never changes. |
+| `YYYYMMDD` | The Monday rebuild of that day. |
+| `sha-<commit>` | The build of one commit on `main`. |
+
+Every image carries the OCI labels `org.opencontainers.image.version` (the version in `app/__init__.py`, which is the last release, also on `latest`), `org.opencontainers.image.revision` (the commit) and `org.opencontainers.image.source`. Image update monitors can match the version label to the release tag, and show a newer build under `latest` as an update.
 
 ## Configuration
 
