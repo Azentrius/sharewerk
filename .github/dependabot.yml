@@ -10,6 +10,10 @@ updates:
       day: "monday"
       timezone: "Europe/Berlin"
     open-pull-requests-limit: 5
+    ignore:
+      # faster-whisper 1.2.1 does not work with PyAV 19 (see requirements.txt).
+      - dependency-name: "av"
+        versions: [">=19"]
     groups:
       pip:
         patterns:

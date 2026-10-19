@@ -4,6 +4,9 @@ uvicorn[standard]==0.54.0
 httpx==0.28.1
 pillow==13.0.0
 faster-whisper==1.2.1
+# faster-whisper 1.2.1 calls av.open(..., metadata_errors=...), which PyAV 19 removed.
+# Keep PyAV below 19 until faster-whisper supports it (tests/test_transcribe.py checks it).
+av==18.1.0
 
 # Downloaders: deliberately unpinned upwards. Instagram and Facebook change
 # often, and only the latest releases keep working. Every image build pulls

@@ -58,6 +58,8 @@ jobs:
             gallery-dl --version
             yt-dlp --version
             python -c "import app.main, faster_whisper"
+            ffmpeg -hide_banner -loglevel error -f lavfi -i sine=frequency=440:duration=1 -ac 1 -ar 16000 /tmp/tone.wav
+            python -c "from faster_whisper.audio import decode_audio; print(len(decode_audio(\"/tmp/tone.wav\")), \"samples decoded\")"
           '
 
   image:
