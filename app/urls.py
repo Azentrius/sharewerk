@@ -15,6 +15,8 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 
+from . import __version__
+
 URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 
 IG_POST_RE = re.compile(r"^/(?:[A-Za-z0-9_.]+/)?(p|reel|reels|tv)/([A-Za-z0-9_-]+)")
@@ -27,6 +29,18 @@ FB_TRACKING_PARAMS = {
 }
 
 FB_SHORT_HOSTS = {"fb.watch", "fb.com"}
+
+# Headers for resolving share and short links. Facebook answers its share links
+# (/share/r/..., /share/v/..., /share/p/...) with 400 to a request that looks like an
+# incomplete browser, but redirects an honest client to the post itself (seen 2026-10).
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.8",
+}
+HONEST_HEADERS = {"User-Agent": f"Sharewerk/{__version__} (+https://github.com/Azentrius/sharewerk)"}
 
 
 class UrlError(ValueError):
@@ -81,22 +95,27 @@ def needs_resolving(url: str) -> bool:
     return bool(IG_SHARE_RE.match(parts.path)) and platform_of(host) in {"instagram", "facebook"}
 
 
-def resolve_redirects(url: str, allowed_hosts: tuple[str, ...], max_hops: int = 5) -> str:
+def resolve_headers(url: str) -> dict[str, str]:
+    """Facebook gets an honest user agent, Instagram the browser-like one it always got."""
+    return HONEST_HEADERS if platform_of(_host(url)) == "facebook" else BROWSER_HEADERS
+
+
+def resolve_redirects(
+    url: str,
+    allowed_hosts: tuple[str, ...],
+    max_hops: int = 5,
+    transport: httpx.BaseTransport | None = None,
+) -> str:
     """Follow redirects of short/share links by hand, re-checking every hop.
 
     Returns the original URL if resolution fails; the extractors may still
-    cope with it.
+    cope with it. `transport` is only for tests.
     """
     current = url
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"
-        ),
-        "Accept-Language": "en-US,en;q=0.8",
-    }
     try:
-        with httpx.Client(follow_redirects=False, timeout=10.0, headers=headers) as client:
+        with httpx.Client(
+            follow_redirects=False, timeout=10.0, headers=resolve_headers(url), transport=transport
+        ) as client:
             for _ in range(max_hops):
                 response = client.get(current)
                 location = response.headers.get("location")

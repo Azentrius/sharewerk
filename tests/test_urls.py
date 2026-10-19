@@ -1,8 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
+import httpx
 import pytest
 
 from app.config import DEFAULT_ALLOWED_HOSTS
-from app.urls import UrlError, extract_url, normalise, target_from_shared
+from app.urls import (
+    BROWSER_HEADERS,
+    HONEST_HEADERS,
+    UrlError,
+    extract_url,
+    needs_resolving,
+    normalise,
+    resolve_headers,
+    resolve_redirects,
+    target_from_shared,
+)
 
 
 def target(*fields):
@@ -86,3 +97,42 @@ def test_first_field_with_url_wins():
 def test_normalise_requires_allowlist():
     with pytest.raises(UrlError):
         normalise("https://www.instagram.com/p/abc/", allowed_hosts=("facebook.com",))
+
+
+def facebook(request: httpx.Request) -> httpx.Response:
+    """Answers like facebook.com did on 2026-10-19: a share link gets 400 for a request that
+    looks like an incomplete browser and a redirect to the reel for any other client."""
+    if request.url.path.startswith("/share/r/"):
+        if "Chrome" in request.headers.get("user-agent", ""):
+            return httpx.Response(400)
+        return httpx.Response(302, headers={"location": "https://www.facebook.com/reel/954162721072206"})
+    return httpx.Response(200)
+
+
+def test_facebook_share_link_resolves_to_the_reel():
+    url = "https://www.facebook.com/share/r/1FHoovVN4K/"
+    assert needs_resolving(url)
+    resolved = resolve_redirects(url, DEFAULT_ALLOWED_HOSTS, transport=httpx.MockTransport(facebook))
+    assert resolved == "https://www.facebook.com/reel/954162721072206"
+    t = normalise(resolved, DEFAULT_ALLOWED_HOSTS)
+    assert (t.platform, t.kind, t.key) == ("facebook", "reel", "954162721072206")
+
+
+def test_facebook_gets_an_honest_user_agent_instagram_keeps_the_browser_one():
+    assert resolve_headers("https://www.facebook.com/share/v/abc/") == HONEST_HEADERS
+    assert resolve_headers("https://fb.watch/abc/") == HONEST_HEADERS
+    assert resolve_headers("https://www.instagram.com/share/abc/") == BROWSER_HEADERS
+    assert HONEST_HEADERS["User-Agent"].startswith("Sharewerk/")
+
+
+def test_resolver_stops_before_login_pages_and_foreign_hosts():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/share/r/login/":
+            return httpx.Response(302, headers={"location": "https://www.facebook.com/login/?next=x"})
+        if request.url.path == "/share/r/away/":
+            return httpx.Response(302, headers={"location": "https://evil.example/steal"})
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    for url in ("https://www.facebook.com/share/r/login/", "https://www.facebook.com/share/r/away/"):
+        assert resolve_redirects(url, DEFAULT_ALLOWED_HOSTS, transport=transport) == url
