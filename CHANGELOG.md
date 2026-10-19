@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 – 2026-10-19
+## 0.1.0 – 2026-10-20
 
 First release: share an Instagram or Facebook post from Android and get it back as one share-ready pack.
 
@@ -15,3 +15,7 @@ First release: share an Instagram or Facebook post from Android and get it back 
 - **Access:** own access token, or `SHAREWERK_AUTH_MODE=none` behind a proxy such as Pomerium.
 - **Interface** in English and German, light and dark, following the Azentrius Design System.
 - **Container:** non-root, read-only root filesystem, no capabilities; results are deleted after 24 hours.
+- **Image:** `ghcr.io/azentrius/sharewerk:latest` is rebuilt on every change and every Monday with the
+  newest downloaders; each release gets its own tag `X.Y.Z`. The label `org.opencontainers.image.version`
+  carries the release version, also on `latest`, so image update monitors can tell a new version from a
+  newer build.

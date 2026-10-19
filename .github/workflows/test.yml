@@ -86,6 +86,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Version from app/__init__.py
+        id: version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/__init__.py)
+          [ -n "$version" ] || { echo "::error::No __version__ in app/__init__.py"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
@@ -94,6 +100,11 @@ jobs:
             type=raw,value=latest
             type=schedule,pattern={{date 'YYYYMMDD'}}
             type=sha,format=short
+          # The version label is __version__ (the last release; only a release PR raises it),
+          # not the first tag (latest or the date), so image update monitors can match it to the
+          # release tag X.Y.Z.
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
