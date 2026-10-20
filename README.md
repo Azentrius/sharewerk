@@ -182,7 +182,7 @@ All settings are environment variables in `.env`. `.env.example` documents each 
 - The downloaders only ever receive URLs on an allowlist of Instagram and Facebook hosts (`SHAREWERK_ALLOWED_HOSTS`). This prevents the server from being used to fetch arbitrary or internal addresses.
 - Never run Sharewerk as an open service for other people. The cookies are yours, and so is the responsibility for what is downloaded with them.
 - The container runs as a non-root user with a read-only root filesystem and no Linux capabilities.
-- Results are deleted after `SHAREWERK_RETENTION_HOURS`.
+- Results are deleted after `SHAREWERK_RETENTION_HOURS`, or right away with the trash icon in "Recently prepared" (`DELETE /api/jobs/<id>`; a post that is still being prepared cannot be deleted).
 
 ## Legal
 

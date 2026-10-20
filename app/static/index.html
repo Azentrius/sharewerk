@@ -173,6 +173,21 @@
     <div><button class="az-btn az-btn--link" id="btn-error-new" type="button" data-i18n="done.new"></button></div>
   </main>
 
+  <!-- Delete a result (confirmation) -->
+  <div class="az-backdrop" id="delete-dialog" hidden>
+    <div class="az-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+      <div class="az-modal__header">
+        <h2 class="az-modal__title" id="delete-title" data-i18n="delete.title"></h2>
+        <button class="az-btn az-btn--plain az-btn--sm" id="delete-close" type="button"><span data-icon="times"></span></button>
+      </div>
+      <div class="az-modal__body"><p id="delete-text"></p></div>
+      <div class="az-modal__footer">
+        <button class="az-btn az-btn--danger" id="delete-confirm" type="button" data-i18n="delete.confirm"></button>
+        <button class="az-btn az-btn--link" id="delete-cancel" type="button" data-i18n="delete.cancel"></button>
+      </div>
+    </div>
+  </div>
+
   <footer class="az-signature">
     <a class="az-signature__mark" href="https://azentrius.de">Azentrius</a>
     <span class="az-signature__meta">
