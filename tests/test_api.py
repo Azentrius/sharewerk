@@ -69,7 +69,7 @@ def test_public_assets_need_no_login(client):
     assert client.get("/manifest.webmanifest").json()["share_target"]["method"] == "GET"
     assert client.get("/sw.js").status_code == 200
     assert client.get("/static/app.js").status_code == 200
-    assert client.get("/healthz").json() == {"ok": True}
+    assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
 
 
 def test_login_flow_sets_cookie(client):
