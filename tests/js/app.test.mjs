@@ -76,8 +76,9 @@ function response(body, type, status = 200) {
   };
 }
 
-// jobs: finished jobs the server knows; created: the answer to POST /api/jobs as [status, body].
-function loadApp(jobs, { created } = {}) {
+// jobs: finished jobs the server knows; created: the answer to POST /api/jobs as [status, body];
+// language: the browser language.
+function loadApp(jobs, { created, language = "en" } = {}) {
   const elements = new Map();
   const requests = [];
   const holds = [];
@@ -119,7 +120,7 @@ function loadApp(jobs, { created } = {}) {
       querySelectorAll: () => [],
     },
     navigator: {
-      language: "en",
+      language,
       canShare: () => true,
       share: async ({ files }) => { shared.push(files); },
       clipboard: { writeText: async (text) => { copied.push(text); } },
@@ -259,6 +260,17 @@ test("an incomplete pack is marked and can be prepared again", async () => {
   app.element("btn-incomplete-retry").click();
   await app.settle();
   assert.deepEqual(app.posted, [{ url: partial.url, force: true }]);
+});
+
+test("a job waiting for the Instagram pause says why", async () => {
+  for (const language of ["en", "de"]) {
+    const app = loadApp({}, { language });
+    await app.settle();
+    app.run('renderProgress({ status: "running", stage: "waiting", queue_position: 0 })');
+    const text = app.element("work-step").textContent;
+    assert.equal(text, app.run('I18N[LANG]["step.waiting"]'));
+    assert.notEqual(text, app.run('t("step.processing")'));
+  }
 });
 
 test("files of the job on screen are loaded once and shared from the cache", async () => {
