@@ -243,6 +243,24 @@ test("the retry after a storage error resends every field of the original share"
   assert.deepEqual(app.posted[1], { ...share, force: true });
 });
 
+test("an incomplete pack is marked and can be prepared again", async () => {
+  const partial = doneJob("P");
+  partial.result.incomplete = "rate_limited";
+  const app = loadApp({ A: doneJob("A"), P: partial }, { created: [503, { detail: { code: "storage_failed" } }] });
+  await app.settle();
+
+  app.run('poll("A")');
+  await app.settle();
+  assert.equal(app.element("incomplete-alert").hidden, true);
+
+  app.run('poll("P")');
+  await app.settle();
+  assert.equal(app.element("incomplete-alert").hidden, false);
+  app.element("btn-incomplete-retry").click();
+  await app.settle();
+  assert.deepEqual(app.posted, [{ url: partial.url, force: true }]);
+});
+
 test("files of the job on screen are loaded once and shared from the cache", async () => {
   const app = loadApp({ A: doneJob("A") });
   await app.settle();

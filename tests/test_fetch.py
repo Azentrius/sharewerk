@@ -69,6 +69,7 @@ def test_media_file_with_error_exit_is_a_failure(runner, tool, tools, raw, setti
         runner(INSTAGRAM, raw, None, settings)
     assert exc.value.code == "download_failed"
     assert "exit status 1" in exc.value.detail and "HTTP Error 500" in exc.value.detail
+    assert len(exc.value.partial.items) == 1  # what did arrive, for an incomplete pack
 
 
 @pytest.mark.parametrize("runner,tool", RUNNERS)
@@ -107,17 +108,37 @@ def test_partial_first_tool_falls_back_to_the_second(tools, tmp_path, with_cooki
     assert result.tool == "yt-dlp"
     assert len(result.items) == 2
     assert result.notes == ["first tool failed: download_failed"]
-    # Nothing of the partial first attempt is left over in the pack's source folder.
+    assert result.incomplete == ""
+    # Nothing of the partial first attempt is left over.
     assert [p.name for p in (tmp_path / "job" / "raw").iterdir() if p.suffix == ".jpg"] == []
+    assert not (tmp_path / "job" / "partial").exists()
 
 
-def test_partial_downloads_of_both_tools_end_in_an_error(tools, tmp_path, settings):
+def test_partial_downloads_of_both_tools_give_the_bigger_one_marked_incomplete(tools, tmp_path, settings):
     tools.set("yt-dlp", files=1, exit=1, stderr="ERROR: [facebook] clip2: Unable to extract video data\n")
-    tools.set("gallery-dl", files=1, exit=4, stderr="[facebook][error] HttpError: 500\n")
+    tools.set("gallery-dl", files=2, exit=4, stderr="[facebook][error] HttpError: 429 Too Many Requests\n")
+    result = fetch(FACEBOOK, tmp_path / "job", settings)
+    assert [c["tool"] for c in tools.calls()] == ["yt-dlp", "gallery-dl"]
+    assert (result.tool, len(result.items), result.incomplete) == ("gallery-dl", 2, "rate_limited")
+    assert "incomplete: rate_limited" in result.notes
+    assert all(item.path.is_file() for item in result.items)
+
+
+def test_a_partial_first_download_is_kept_when_the_second_tool_finds_nothing(tools, tmp_path, with_cookies):
+    tools.set("gallery-dl", files=2, exit=4, stderr="[instagram][error] HttpError: 429 Too Many Requests\n")
+    tools.set("yt-dlp", exit=1, stderr="ERROR: [instagram] Unable to extract data\n")
+    result = fetch(INSTAGRAM, tmp_path / "job", with_cookies)
+    assert (result.tool, len(result.items), result.incomplete) == ("gallery-dl", 2, "rate_limited")
+    assert all(item.path.is_file() for item in result.items)
+    assert result.meta.author == "examplecreator"  # metadata of the partial download is kept
+
+
+def test_no_files_from_either_tool_is_still_an_error(tools, tmp_path, settings):
+    tools.set("yt-dlp", exit=1, stderr="ERROR: [facebook] HTTP Error 404: Not Found\n")
+    tools.set("gallery-dl", exit=4, stderr="[facebook][error] HttpError: 404\n")
     with pytest.raises(FetchError) as exc:
         fetch(FACEBOOK, tmp_path / "job", settings)
-    assert exc.value.code == "download_failed"
-    assert [c["tool"] for c in tools.calls()] == ["yt-dlp", "gallery-dl"]
+    assert exc.value.code == "not_found"
 
 
 def test_complete_first_tool_needs_no_fallback(tools, tmp_path, with_cookies):
