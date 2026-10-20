@@ -83,6 +83,7 @@ function loadApp(jobs, { created } = {}) {
   const holds = [];
   const shared = [];
   const copied = [];
+  const posted = []; // bodies of POST /api/jobs
 
   async function fetch(url, options = {}) {
     requests.push(url);
@@ -90,6 +91,7 @@ function loadApp(jobs, { created } = {}) {
     const hold = holds.find((h) => h.url === url && h.nth === nth);
     if (hold) await hold.gate.promise;
     if (url === "/api/jobs" && options.method === "POST") {
+      posted.push(JSON.parse(options.body));
       const [status, body] = created;
       return response(JSON.stringify(body), "application/json", status);
     }
@@ -137,6 +139,7 @@ function loadApp(jobs, { created } = {}) {
     run: (code) => vm.runInContext(code, context),
     shared,
     copied,
+    posted,
     // Answers the nth request to a URL only when the returned function is called.
     hold(url, nth = 1) {
       const gate = deferred();
@@ -219,6 +222,25 @@ test("a job the server cannot save is shown as a storage error, not as an invali
   assert.equal(app.element("error-title").textContent, app.run('t("err.storage_failed.title")'));
   assert.equal(app.element("error-source").textContent, link);
   assert.equal(app.element("error-actions").hidden, false); // "Prepare post again"
+});
+
+test("the retry after a storage error resends every field of the original share", async () => {
+  // Some apps put the link only into the title of a share.
+  const share = { title: "Look at this https://www.instagram.com/p/T/", text: null, url: null };
+  const app = loadApp({}, { created: [503, { detail: { code: "storage_failed", message: "No space left on device" } }] });
+  await app.settle();
+  app.run(`startJob(${JSON.stringify(share)})`);
+  await app.settle();
+
+  assert.equal(app.element("view-error").hidden, false);
+  assert.equal(app.element("error-source-line").hidden, false);
+  assert.equal(app.element("error-source").textContent, share.title);
+  assert.equal(app.element("error-actions").hidden, false);
+
+  app.element("btn-retry").click();
+  await app.settle();
+  assert.equal(app.posted.length, 2);
+  assert.deepEqual(app.posted[1], { ...share, force: true });
 });
 
 test("files of the job on screen are loaded once and shared from the cache", async () => {

@@ -420,10 +420,13 @@ $("link-form").addEventListener("submit", (event) => {
 });
 
 // ------------------------------------------------------------------------- job
+// What was shared, for display: apps put the link into url, text or only the title.
+const sharedText = (body) => body.url || body.text || body.title || "";
+
 async function startJob(body) {
   show("work");
   const mine = generation;
-  $("work-source").textContent = body.url || body.text || "";
+  $("work-source").textContent = sharedText(body);
   renderProgress({ status: "queued", stage: "queued", queue_position: 0 });
   try {
     const job = await api("/api/jobs", {
@@ -438,9 +441,10 @@ async function startJob(body) {
     if (mine !== generation || error.code === "unauthorised") return;
     history.replaceState(null, "", "/");
     if (error.code.startsWith("network")) return renderError({ error_code: "network", url: "" });
-    // The link was fine, the server could not store the job: an error page with a retry.
-    if (error.code === "storage_failed") return renderError({ error_code: error.code, url: body.url || body.text || "" });
-    showHome(error.code, body.url || body.text || "");
+    // The link was fine, the server could not store the job: an error page whose retry sends
+    // the original fields again.
+    if (error.code === "storage_failed") return renderError({ error_code: error.code }, body);
+    showHome(error.code, sharedText(body));
   }
 }
 
@@ -667,18 +671,20 @@ function showDownloads(job, names) {
 }
 
 // ----------------------------------------------------------------------- error
-function renderError(job) {
+// request: what "Prepare post again" submits again; by default the job's link.
+function renderError(job, request = { url: job.url }) {
   show("error");
   let code = job.error_code || "internal";
   if (t(`err.${code}.title`) === `err.${code}.title`) code = "internal";
   $("error-title").textContent = t(`err.${code}.title`);
   $("error-text").textContent = t(`err.${code}.body`, { h: config.retention_hours });
-  $("error-source-line").hidden = !job.url;
-  $("error-source").textContent = job.url || "";
+  const source = sharedText(request);
+  $("error-source-line").hidden = !source;
+  $("error-source").textContent = source;
   $("error-details-line").hidden = !job.error_detail;
   $("error-details").textContent = job.error_detail || "";
-  $("error-actions").hidden = !job.url;
-  $("btn-retry").onclick = () => startJob({ url: job.url, force: true });
+  $("error-actions").hidden = !source;
+  $("btn-retry").onclick = () => startJob({ ...request, force: true });
 }
 
 $("btn-new").addEventListener("click", () => { history.replaceState(null, "", "/"); fileCache.clear(); showHome(undefined, ""); });
