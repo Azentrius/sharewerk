@@ -6,13 +6,14 @@ import errno
 import json
 import threading
 import time
+import uuid
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.fetch import FetchError
-from app.jobs import JobStore
+from app.jobs import Job, JobStore
 from app.main import create_app
 from app.urls import Target
 
@@ -148,6 +149,68 @@ def test_health_reports_storage_failures_and_recovers(settings, disk):
         assert client.get("/healthz").json() == {"ok": True}
         again = client.post("/api/jobs", json={"url": "https://www.instagram.com/p/second/"}).json()["id"]
         assert finished(store, again).status == "done"
+
+
+def persisted_queued_job(settings, key: str) -> str:
+    """A job that was queued when the server went down, as job.json on the data volume."""
+    job = Job(uuid.uuid4().hex, f"https://www.instagram.com/p/{key}/", "instagram", "post", key)
+    directory = settings.jobs_dir / job.id
+    directory.mkdir(parents=True)
+    real_write_text(directory / "job.json", json.dumps(job.public()), encoding="utf-8")
+    return job.id
+
+
+def test_restart_while_storage_still_fails_is_unhealthy_until_it_works(settings, disk):
+    interrupted = persisted_queued_job(settings, "interrupted")
+    disk.full = True  # the disk is still full when the server starts again
+    with TestClient(create_app(settings, runner=runner), base_url="https://testserver") as client:
+        client.headers["Authorization"] = f"Bearer {TOKEN}"
+        restored = client.get(f"/api/jobs/{interrupted}").json()
+        assert (restored["status"], restored["error_code"]) == ("error", "interrupted")
+
+        health = client.get("/healthz")
+        assert health.status_code == 503
+        assert health.json() == {"ok": False, "problem": "storage_failed"}
+
+        disk.full = False  # space was freed, no restart
+        assert client.get("/healthz").json() == {"ok": True}
+        job_id = client.post("/api/jobs", json={"url": "https://www.instagram.com/p/after/"}).json()["id"]
+        assert finished(client.app.state.store, job_id).status == "done"
+
+
+def test_failed_submit_leaves_no_job_behind_and_the_retry_is_processed(settings, disk):
+    url = "https://www.instagram.com/p/retried/"
+    app = create_app(settings, runner=runner)
+    with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as client:
+        client.headers["Authorization"] = f"Bearer {TOKEN}"
+        store = client.app.state.store
+
+        disk.full = True
+        failed = client.post("/api/jobs", json={"url": url})
+        assert failed.status_code == 503
+        assert failed.json()["detail"]["code"] == "storage_failed"
+        assert client.get("/api/jobs").json() == []  # nothing that waits forever
+        assert [p for p in settings.jobs_dir.iterdir() if p.is_dir()] == []
+        assert client.get("/healthz").json() == {"ok": False, "problem": "storage_failed"}
+
+        disk.full = False
+        retry = client.post("/api/jobs", json={"url": url})  # the same link, without force
+        assert retry.status_code == 200
+        job = finished(store, retry.json()["id"])
+        assert job.status == "done"
+        assert client.get("/healthz").json() == {"ok": True}
+
+
+def test_duplicates_of_running_and_finished_jobs_are_still_reused(store):
+    first = store.submit(target("WAIT"))
+    deadline = time.time() + 5
+    while store.get(first.id).status != "running" and time.time() < deadline:
+        time.sleep(0.02)
+    assert store.submit(target("WAIT")).id == first.id  # running
+    release.set()
+    assert finished(store, first.id).status == "done"
+    assert store.submit(target("WAIT")).id == first.id  # done
+    assert store.submit(target("WAIT"), force=True).id != first.id
 
 
 def test_health_reports_a_stopped_worker(settings, disk):

@@ -65,10 +65,10 @@ function doneJob(id) {
   };
 }
 
-function response(body, type) {
+function response(body, type, status = 200) {
   return {
-    ok: true,
-    status: 200,
+    ok: status < 400,
+    status,
     headers: { get: (name) => (name.toLowerCase() === "content-type" ? type : null) },
     json: async () => JSON.parse(body),
     text: async () => body,
@@ -76,18 +76,23 @@ function response(body, type) {
   };
 }
 
-function loadApp(jobs) {
+// jobs: finished jobs the server knows; created: the answer to POST /api/jobs as [status, body].
+function loadApp(jobs, { created } = {}) {
   const elements = new Map();
   const requests = [];
   const holds = [];
   const shared = [];
   const copied = [];
 
-  async function fetch(url) {
+  async function fetch(url, options = {}) {
     requests.push(url);
     const nth = requests.filter((u) => u === url).length;
     const hold = holds.find((h) => h.url === url && h.nth === nth);
     if (hold) await hold.gate.promise;
+    if (url === "/api/jobs" && options.method === "POST") {
+      const [status, body] = created;
+      return response(JSON.stringify(body), "application/json", status);
+    }
     if (url === "/api/config") return response(JSON.stringify({ version: "0.1.0", retention_hours: 24 }), "application/json");
     if (url === "/api/jobs") return response("[]", "application/json");
     for (const job of Object.values(jobs)) {
@@ -199,6 +204,21 @@ test("a late text preview of a left job does not replace the text on screen", as
   await app.element("btn-share").onclick();
   await app.settle();
   assert.deepEqual((await namesAndContents(app.shared[0])).map(([name]) => name), ["instagram-B.txt", "instagram-B-01.jpg"]);
+});
+
+test("a job the server cannot save is shown as a storage error, not as an invalid link", async () => {
+  const link = "https://www.instagram.com/p/A/";
+  const app = loadApp({}, { created: [503, { detail: { code: "storage_failed", message: "No space left on device" } }] });
+  await app.settle();
+  app.run(`startJob({ url: ${JSON.stringify(link)} })`);
+  await app.settle();
+
+  assert.equal(app.element("view-error").hidden, false);
+  assert.equal(app.element("view-home").hidden, true);
+  assert.equal(app.element("link-error").hidden, true);
+  assert.equal(app.element("error-title").textContent, app.run('t("err.storage_failed.title")'));
+  assert.equal(app.element("error-source").textContent, link);
+  assert.equal(app.element("error-actions").hidden, false); // "Prepare post again"
 });
 
 test("files of the job on screen are loaded once and shared from the cache", async () => {

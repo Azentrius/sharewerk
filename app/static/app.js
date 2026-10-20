@@ -92,7 +92,7 @@ const I18N = {
     "err.interrupted.body": "The server restarted in the meantime. Prepare the post again.",
     "err.internal.title": "An error occurred while preparing the post",
     "err.internal.body": "The details below help with debugging. docker compose logs sharewerk shows the logs.",
-    "err.storage_failed.title": "The server could not save the result",
+    "err.storage_failed.title": "The server could not save the post",
     "err.storage_failed.body": "Its data volume is probably full or read-only. Free up space on the server, then prepare the post again.",
     "err.job_not_found.title": "This result has expired",
     "err.job_not_found.body": "Results are deleted after {h} hours. Prepare the post again.",
@@ -188,7 +188,7 @@ const I18N = {
     "err.interrupted.body": "Der Server wurde währenddessen neu gestartet. Bereite den Beitrag erneut auf.",
     "err.internal.title": "Bei der Aufbereitung ist ein Fehler aufgetreten",
     "err.internal.body": "Die Details unten helfen bei der Fehlersuche. Die Protokolle zeigt docker compose logs sharewerk.",
-    "err.storage_failed.title": "Der Server konnte das Ergebnis nicht speichern",
+    "err.storage_failed.title": "Der Server konnte den Beitrag nicht speichern",
     "err.storage_failed.body": "Vermutlich ist sein Datenspeicher voll oder schreibgeschützt. Gib auf dem Server Platz frei und bereite den Beitrag dann erneut auf.",
     "err.job_not_found.title": "Dieses Ergebnis ist abgelaufen",
     "err.job_not_found.body": "Ergebnisse werden nach {h} Stunden gelöscht. Bereite den Beitrag erneut auf.",
@@ -438,6 +438,8 @@ async function startJob(body) {
     if (mine !== generation || error.code === "unauthorised") return;
     history.replaceState(null, "", "/");
     if (error.code.startsWith("network")) return renderError({ error_code: "network", url: "" });
+    // The link was fine, the server could not store the job: an error page with a retry.
+    if (error.code === "storage_failed") return renderError({ error_code: error.code, url: body.url || body.text || "" });
     showHome(error.code, body.url || body.text || "");
   }
 }

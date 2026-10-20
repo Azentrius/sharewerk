@@ -189,7 +189,7 @@ Sharewerk is a tool for personal use: it saves you from taking screenshots of po
 | Too many requests | Rate limit on the account | Wait, then try again |
 | Not in share menu | App not installed | Install from Chrome's menu |
 | Transcript says "music only" | No speech in the audio | Expected for music reels |
-| The server could not save the result | Data volume full or read-only | Free up space, then prepare the post again |
+| The server could not save the post | Data volume full or read-only | Free up space, then prepare the post again |
 | `/healthz` answers 503 | `worker_stopped`: the job worker ended; `storage_failed`: job states cannot be saved | Check the logs and the data volume, restart Sharewerk |
 
 Logs: `docker compose logs -f sharewerk`

@@ -182,20 +182,31 @@ class JobStore:
                 try:
                     self._save(job)
                 except StorageError as exc:
-                    log.warning("%s", exc)  # the state is right in memory; saved again later
+                    # The state is right in memory. Counting the failure makes the health check
+                    # probe the volume until writing works again.
+                    self._storage_failures += 1
+                    log.error("%s", exc)
             self._jobs[job.id] = job
 
     # ------------------------------------------------------------------- public
     def submit(self, target: Target, force: bool = False) -> Job:
+        """A new job, or the pending or finished one for the same link. A new job becomes known
+        only after its job.json is saved: a failed save must leave nothing that a retry of the
+        same link would find and that never runs. Raises StorageError."""
         with self._lock:
             if not force:
                 for job in sorted(self._jobs.values(), key=lambda j: j.created, reverse=True):
                     if job.url == target.url and job.status != "error":
                         return job
             job = Job(uuid.uuid4().hex, target.url, target.platform, target.kind, target.key)
+            try:
+                self._save(job)  # creates the job's folder too
+            except StorageError as exc:
+                shutil.rmtree(self.workdir(job.id), ignore_errors=True)
+                self._storage_failures += 1
+                log.error("%s", exc)
+                raise
             self._jobs[job.id] = job
-            self.workdir(job.id).mkdir(parents=True, exist_ok=True)
-            self._save(job)
         self._queue.put(job.id)
         return job
 
