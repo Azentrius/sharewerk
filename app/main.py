@@ -143,8 +143,12 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
         return FileResponse(STATIC / "icons" / "icon-192.png", media_type="image/png")
 
     @app.get("/healthz", include_in_schema=False)
-    def healthz() -> dict:
-        return {"ok": True}
+    def healthz() -> Response:
+        # 503 when jobs cannot be processed: the worker stopped, or job states cannot be saved.
+        problem = store.problem()
+        if problem:
+            return JSONResponse({"ok": False, "problem": problem}, status_code=503)
+        return JSONResponse({"ok": True})
 
     @app.get("/login", include_in_schema=False)
     def login_page(request: Request, error: str = "") -> Response:

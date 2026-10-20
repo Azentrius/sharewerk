@@ -92,6 +92,8 @@ const I18N = {
     "err.interrupted.body": "The server restarted in the meantime. Prepare the post again.",
     "err.internal.title": "An error occurred while preparing the post",
     "err.internal.body": "The details below help with debugging. docker compose logs sharewerk shows the logs.",
+    "err.storage_failed.title": "The server could not save the result",
+    "err.storage_failed.body": "Its data volume is probably full or read-only. Free up space on the server, then prepare the post again.",
     "err.job_not_found.title": "This result has expired",
     "err.job_not_found.body": "Results are deleted after {h} hours. Prepare the post again.",
     "err.network.title": "No connection to the server",
@@ -186,6 +188,8 @@ const I18N = {
     "err.interrupted.body": "Der Server wurde währenddessen neu gestartet. Bereite den Beitrag erneut auf.",
     "err.internal.title": "Bei der Aufbereitung ist ein Fehler aufgetreten",
     "err.internal.body": "Die Details unten helfen bei der Fehlersuche. Die Protokolle zeigt docker compose logs sharewerk.",
+    "err.storage_failed.title": "Der Server konnte das Ergebnis nicht speichern",
+    "err.storage_failed.body": "Vermutlich ist sein Datenspeicher voll oder schreibgeschützt. Gib auf dem Server Platz frei und bereite den Beitrag dann erneut auf.",
     "err.job_not_found.title": "Dieses Ergebnis ist abgelaufen",
     "err.job_not_found.body": "Ergebnisse werden nach {h} Stunden gelöscht. Bereite den Beitrag erneut auf.",
     "err.network.title": "Keine Verbindung zum Server",
@@ -207,9 +211,12 @@ const PLATFORMS = { instagram: "Instagram", facebook: "Facebook" };
 // --------------------------------------------------------------------- helpers
 const $ = (id) => document.getElementById(id);
 const VIEWS = ["home", "work", "done", "error"];
-const fileCache = new Map(); // server file name -> File
-let currentJob = null;
+const fileCache = new Map(); // `${job id}/${server file name}` -> File
+const cacheKey = (jobId, name) => `${jobId}/${name}`;
 let config = { retention_hours: 24, version: "" };
+// Every change of view starts a new generation. Code that waited for the server checks that its
+// generation is still current, so a late answer for a job the user left changes nothing.
+let generation = 0;
 
 function applyStatic() {
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
@@ -219,6 +226,7 @@ function applyStatic() {
 }
 
 function show(view) {
+  generation += 1;
   VIEWS.forEach((v) => { $(`view-${v}`).hidden = v !== view; });
   hideAlert();
   window.scrollTo({ top: 0 });
@@ -414,6 +422,7 @@ $("link-form").addEventListener("submit", (event) => {
 // ------------------------------------------------------------------------- job
 async function startJob(body) {
   show("work");
+  const mine = generation;
   $("work-source").textContent = body.url || body.text || "";
   renderProgress({ status: "queued", stage: "queued", queue_position: 0 });
   try {
@@ -422,10 +431,11 @@ async function startJob(body) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (mine !== generation) return;
     history.replaceState(null, "", `/?job=${job.id}`);
     await poll(job.id);
   } catch (error) {
-    if (error.code === "unauthorised") return;
+    if (mine !== generation || error.code === "unauthorised") return;
     history.replaceState(null, "", "/");
     if (error.code.startsWith("network")) return renderError({ error_code: "network", url: "" });
     showHome(error.code, body.url || body.text || "");
@@ -434,17 +444,18 @@ async function startJob(body) {
 
 async function poll(jobId) {
   show("work");
+  const mine = generation;
   let delay = 800;
   for (;;) {
     let job;
     try {
       job = await api(`/api/jobs/${jobId}`);
     } catch (error) {
-      if (error.code === "unauthorised") return;
+      if (mine !== generation || error.code === "unauthorised") return;
       if (error.code === "network") { await sleep(3000); continue; }
       return renderError({ error_code: error.code, url: "" });
     }
-    currentJob = job;
+    if (mine !== generation) return; // the user went on to something else
     $("work-source").textContent = job.url;
     if (job.status === "done") return renderDone(job);
     if (job.status === "error") return renderError(job);
@@ -465,6 +476,7 @@ function renderProgress(job) {
 // ---------------------------------------------------------------------- result
 async function renderDone(job) {
   show("done");
+  const mine = generation;
   const r = job.result;
   const m = r.meta;
   const platform = PLATFORMS[m.platform] || m.platform;
@@ -487,8 +499,9 @@ async function renderDone(job) {
 
   const canShareFiles = typeof navigator.canShare === "function";
   const shareButton = $("btn-share");
+  setLoading(shareButton, false); // a job left while loading must not leave the button busy
   shareButton.hidden = !canShareFiles;
-  shareButton.onclick = () => shareBatch(shareButton, primary);
+  shareButton.onclick = () => shareBatch(shareButton, job, primary);
   $("downloads").hidden = true;
   if (!canShareFiles) showDownloads(job, primary);
 
@@ -501,13 +514,13 @@ async function renderDone(job) {
     if (r.packs.compact) {
       r.packs.full.forEach((batch, i, all) => {
         const label = all.length === 1 ? t("more.single") : t("more.singlePart", { i: i + 1, n: all.length });
-        const b = button(label, "share-alt", () => shareBatch(b, batch));
+        const b = button(label, "share-alt", () => shareBatch(b, job, batch));
         more.append(b);
       });
     }
     (r.packs.originals || []).forEach((batch, i, all) => {
       const label = all.length === 1 ? t("more.original") : t("more.originalPart", { i: i + 1, n: all.length });
-      const b = button(label, "share-alt", () => shareBatch(b, batch));
+      const b = button(label, "share-alt", () => shareBatch(b, job, batch));
       more.append(b);
     });
   }
@@ -519,6 +532,7 @@ async function renderDone(job) {
     const res = await fetch(fileUrl(job.id, primary[0]), { credentials: "same-origin" });
     text = await res.text();
   } catch { /* preview is optional */ }
+  if (mine !== generation) return; // the user left this job meanwhile
   $("result-text").textContent = text;
   $("btn-copy").onclick = async () => {
     try {
@@ -533,6 +547,7 @@ async function renderDone(job) {
   if (canShareFiles) {
     setLoading(shareButton, true);
     try { await loadFiles(job, primary); } catch { /* retried on tap */ }
+    if (mine !== generation) return;
     setLoading(shareButton, false);
   }
 }
@@ -581,29 +596,34 @@ function setLoading(btn, loading) {
   btn.disabled = loading;
 }
 
+// Files are cached per job. A file that arrives after the user left its job is dropped.
 async function loadFiles(job, names) {
+  const mine = generation;
   const files = [];
   for (const name of names) {
-    if (!fileCache.has(name)) {
+    const key = cacheKey(job.id, name);
+    if (!fileCache.has(key)) {
       const meta = job.result.files[name];
       const res = await fetch(fileUrl(job.id, name), { credentials: "same-origin" });
       if (!res.ok) throw new ApiError("file_not_found");
       const blob = await res.blob();
-      fileCache.set(name, new File([blob], meta.name, { type: meta.type }));
+      if (mine !== generation) throw new ApiError("left");
+      fileCache.set(key, new File([blob], meta.name, { type: meta.type }));
     }
-    files.push(fileCache.get(name));
+    files.push(fileCache.get(key));
   }
   return files;
 }
 
-async function shareBatch(btn, names) {
-  const job = currentJob;
+async function shareBatch(btn, job, names) {
+  const mine = generation;
   hideAlert();
   let files;
   try {
-    if (!names.every((n) => fileCache.has(n))) setLoading(btn, true);
+    if (!names.every((n) => fileCache.has(cacheKey(job.id, n)))) setLoading(btn, true);
     files = await loadFiles(job, names);
   } catch {
+    if (mine !== generation) return;
     setLoading(btn, false);
     return showAlert("danger", t("alert.loadFailedTitle"), t("alert.loadFailedBody"));
   }

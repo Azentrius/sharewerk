@@ -36,6 +36,12 @@ def _int(name: str, default: int) -> int:
     return int(raw) if raw else default
 
 
+def _path(name: str, default: str) -> Path:
+    """An absolute path: the downloaders run in another working directory, where a relative
+    path (e.g. SHAREWERK_DATA_DIR=./data) would point somewhere else."""
+    return Path(os.environ.get(name, default)).resolve()
+
+
 def _list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -95,11 +101,9 @@ def load_settings() -> Settings:
     s = Settings(
         auth_mode=os.environ.get("SHAREWERK_AUTH_MODE", "token").strip().lower(),
         auth_token=os.environ.get("SHAREWERK_AUTH_TOKEN", "").strip(),
-        data_dir=Path(os.environ.get("SHAREWERK_DATA_DIR", "/data")),
-        cookies_file=Path(os.environ.get("SHAREWERK_COOKIES_FILE", "/secrets/cookies.txt")),
-        gallery_dl_config=Path(
-            os.environ.get("SHAREWERK_GALLERY_DL_CONFIG", "/secrets/gallery-dl.conf")
-        ),
+        data_dir=_path("SHAREWERK_DATA_DIR", "/data"),
+        cookies_file=_path("SHAREWERK_COOKIES_FILE", "/secrets/cookies.txt"),
+        gallery_dl_config=_path("SHAREWERK_GALLERY_DL_CONFIG", "/secrets/gallery-dl.conf"),
         whisper_model=os.environ.get("SHAREWERK_WHISPER_MODEL", "small").strip(),
         whisper_language=os.environ.get("SHAREWERK_WHISPER_LANGUAGE", "").strip(),
         whisper_threads=_int("SHAREWERK_WHISPER_THREADS", 0),

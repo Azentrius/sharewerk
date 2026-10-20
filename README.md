@@ -189,6 +189,8 @@ Sharewerk is a tool for personal use: it saves you from taking screenshots of po
 | Too many requests | Rate limit on the account | Wait, then try again |
 | Not in share menu | App not installed | Install from Chrome's menu |
 | Transcript says "music only" | No speech in the audio | Expected for music reels |
+| The server could not save the result | Data volume full or read-only | Free up space, then prepare the post again |
+| `/healthz` answers 503 | `worker_stopped`: the job worker ended; `storage_failed`: job states cannot be saved | Check the logs and the data volume, restart Sharewerk |
 
 Logs: `docker compose logs -f sharewerk`
 
@@ -199,6 +201,7 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 ruff check
 python -m pytest
+node --test tests/js/app.test.mjs   # app.js in a sandbox, no npm packages needed
 SHAREWERK_AUTH_MODE=none SHAREWERK_DATA_DIR=./data SHAREWERK_COOKIE_SECURE=false python -m app.main
 ```
 

@@ -115,6 +115,22 @@ def _media_files(directory: Path) -> list[Path]:
     )
 
 
+def _check(tool: str, proc: subprocess.CompletedProcess[str], files: list[Path]) -> None:
+    """Raise FetchError unless the tool finished cleanly with at least one file.
+
+    A non-zero exit status after some files means items of the post are missing, so it is a
+    failure too (and the caller tries the other tool). The configured limits (--range,
+    --playlist-items, the maximum file size) end with status 0 in both tools.
+    """
+    if proc.returncode == 0 and files:
+        return
+    output = proc.stderr + proc.stdout
+    detail = _tail(output)
+    if proc.returncode != 0:
+        detail = f"{tool} ended with exit status {proc.returncode} after {len(files)} file(s)\n{detail}"
+    raise FetchError(classify_error(output), detail.strip())
+
+
 def _kind(path: Path) -> str:
     return "video" if path.suffix.lower() in VIDEO_EXT else "image"
 
@@ -143,6 +159,9 @@ def _first(data: dict, *keys: str) -> str:
 # --------------------------------------------------------------------- gallery-dl
 
 def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Settings) -> FetchResult:
+    # The tool runs inside raw, so every path it gets must be absolute.
+    raw = raw.resolve()
+    config = settings.gallery_dl_config.resolve()
     cmd = _tool("gallery-dl") + [
         "--directory", str(raw),
         "--write-metadata",
@@ -150,17 +169,15 @@ def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Se
         "--filesize-max", f"{settings.max_download_mb}M",
         "--no-part",
     ]
-    if settings.gallery_dl_config.is_file():
-        cmd += ["--config", str(settings.gallery_dl_config)]
+    if config.is_file():
+        cmd += ["--config", str(config)]
     if cookies:
-        cmd += ["--cookies", str(cookies)]
+        cmd += ["--cookies", str(cookies.resolve())]
     cmd.append(target.url)
 
     proc = _run(cmd, cwd=raw)
     files = _media_files(raw)
-    if not files:
-        output = proc.stderr + proc.stdout
-        raise FetchError(classify_error(output), _tail(output))
+    _check("gallery-dl", proc, files)
 
     entries = []
     for path in files:
@@ -192,6 +209,8 @@ def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Se
 # ------------------------------------------------------------------------- yt-dlp
 
 def run_yt_dlp(target: Target, raw: Path, cookies: Path | None, settings: Settings) -> FetchResult:
+    # The tool runs inside raw, so every path it gets must be absolute.
+    raw = raw.resolve()
     cmd = _tool("yt-dlp") + [
         "--use-extractors", "instagram.*,facebook.*",
         "--output", str(raw / "%(playlist_index&{:03d}_|)s%(id)s.%(ext)s"),
@@ -208,14 +227,12 @@ def run_yt_dlp(target: Target, raw: Path, cookies: Path | None, settings: Settin
         "--retries", "2",
     ]
     if cookies:
-        cmd += ["--cookies", str(cookies)]
+        cmd += ["--cookies", str(cookies.resolve())]
     cmd.append(target.url)
 
     proc = _run(cmd, cwd=raw)
     files = _media_files(raw)
-    if not files:
-        output = proc.stderr + proc.stdout
-        raise FetchError(classify_error(output), _tail(output))
+    _check("yt-dlp", proc, files)
 
     infos: dict[str, dict] = {}
     for info_path in raw.glob("*.info.json"):
@@ -248,6 +265,7 @@ def _tail(text: str, lines: int = 6) -> str:
 def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
     """Download into workdir/raw. Cookies are copied per job and deleted after,
     because both tools write updated cookies back into the file they were given."""
+    workdir = workdir.resolve()  # the tools run in raw; relative paths would point below it
     raw = workdir / "raw"
     raw.mkdir(parents=True, exist_ok=True)
 
