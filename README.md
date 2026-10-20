@@ -72,7 +72,7 @@ The first video you process downloads the Whisper speech model (about 500 MB for
 
 Instagram shows almost nothing to logged-out visitors, so the downloaders need the cookies of a logged-in account. Facebook videos often work without cookies.
 
-1. **Use a secondary account, not your main one.** Automated access violates Meta's terms of use, and accounts used this way can be rate-limited or blocked.
+1. **Use a secondary account, not your main one.** Automated access violates Meta's terms of use, and accounts used this way can be rate-limited or blocked. To make that less likely, Sharewerk waits `SHAREWERK_INSTAGRAM_PAUSE` seconds (20 by default) between the starts of two Instagram downloads; the page says so while a post waits.
 2. Create a separate browser profile, log in to that account there, and do nothing else in that profile. This keeps the cookie file limited to that one account.
 3. Export the cookies in Netscape `cookies.txt` format, for example with the browser extension "Get cookies.txt LOCALLY" (Chrome) or "cookies.txt" (Firefox). In Chrome, take the one with "LOCALLY" in its name: an older extension called "Get cookies.txt" was removed from the Chrome Web Store as malware. Export instagram.com, and facebook.com if you want it.
 4. Close the browser profile without logging out (logging out invalidates the cookies).
@@ -175,6 +175,7 @@ All settings are environment variables in `.env`. `.env.example` documents each 
 | `SHAREWERK_IMAGE_MAX_EDGE` | `1568` | Long edge of shared images in px |
 | `SHAREWERK_MAX_FRAMES` | `8` | Key frames per video |
 | `SHAREWERK_RETENTION_HOURS` | `24` | Results are deleted afterwards |
+| `SHAREWERK_INSTAGRAM_PAUSE` | `20` | Seconds between the starts of two Instagram downloads (`0` = no pause) |
 
 ## Security notes
 

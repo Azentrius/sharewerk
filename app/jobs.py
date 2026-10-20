@@ -149,6 +149,7 @@ class JobStore:
         self._storage_failures = 0  # jobs in a row whose state could not be saved
         # What the last Instagram download said about the cookies ("ok" or "expired"), and when.
         self._cookies: tuple[str, float] = ("unknown", 0.0)
+        self._last_instagram: float | None = None  # time.monotonic() of the last Instagram download
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -323,6 +324,10 @@ class JobStore:
                 self._storage_failures = 0
 
     def _process(self, job: Job) -> None:
+        if job.platform == "instagram":
+            self._instagram_pause(job)
+            if self._stop.is_set():
+                return  # shutting down; a restart marks the job interrupted
         self._update(job, status="running", stage="downloading")
         try:
             result = self.runner(job, self.workdir(job.id), self.settings, lambda s: self._update(job, stage=s))
@@ -340,6 +345,16 @@ class JobStore:
         self._update(job, status="done", stage="done", result=result)
         self._note_cookies(job)
         log.info("job %s done (%s)", job.id, job.url)
+
+    def _instagram_pause(self, job: Job) -> None:
+        """Keep SHAREWERK_INSTAGRAM_PAUSE seconds between the starts of two Instagram downloads:
+        bursts of requests are what gets the account of the cookies throttled or blocked."""
+        if self._last_instagram is not None:
+            wait = self._last_instagram + self.settings.instagram_pause_seconds - time.monotonic()
+            if wait > 0:
+                self._update(job, status="running", stage="waiting")
+                self._stop.wait(wait)
+        self._last_instagram = time.monotonic()
 
     def _give_up(self, job: Job, code: str, detail: str) -> None:
         """Mark a job as failed after its state could not be saved: in memory in any case, so

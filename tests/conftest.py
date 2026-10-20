@@ -23,6 +23,7 @@ def settings(tmp_path: Path) -> Settings:
         gallery_dl_config=tmp_path / "missing-gallery-dl.conf",
         whisper_model="off",
         cookie_secure=False,
+        instagram_pause_seconds=0,  # tests/test_pause.py sets it where it matters
     )
 
 

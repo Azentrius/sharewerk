@@ -69,6 +69,8 @@ class Settings:
     max_items: int = 20
     max_download_mb: int = 500
     retention_hours: int = 24
+    # Seconds between the starts of two Instagram downloads; 0 switches the pause off.
+    instagram_pause_seconds: float = 20
     allowed_hosts: tuple[str, ...] = field(default=DEFAULT_ALLOWED_HOSTS)
     cookie_secure: bool = True
 
@@ -95,6 +97,8 @@ class Settings:
             )
         if self.image_max_edge < 256:
             raise ConfigError("SHAREWERK_IMAGE_MAX_EDGE must be at least 256.")
+        if self.instagram_pause_seconds < 0:
+            raise ConfigError("SHAREWERK_INSTAGRAM_PAUSE must be 0 or more seconds.")
 
 
 def load_settings() -> Settings:
@@ -113,6 +117,7 @@ def load_settings() -> Settings:
         max_items=_int("SHAREWERK_MAX_ITEMS", 20),
         max_download_mb=_int("SHAREWERK_MAX_DOWNLOAD_MB", 500),
         retention_hours=_int("SHAREWERK_RETENTION_HOURS", 24),
+        instagram_pause_seconds=_int("SHAREWERK_INSTAGRAM_PAUSE", 20),
         allowed_hosts=_list("SHAREWERK_ALLOWED_HOSTS", DEFAULT_ALLOWED_HOSTS),
         cookie_secure=_bool("SHAREWERK_COOKIE_SECURE", True),
     )
