@@ -48,6 +48,8 @@ const I18N = {
     "done.open": "Open post",
     "done.textTitle": "Text that is shared",
     "done.new": "Prepare another post",
+    "done.incompleteTitle": "This pack is incomplete",
+    "done.incompleteBody": "Instagram or Facebook stopped the download early, so the post may have more pictures than these. Prepare it again later for the rest.",
     "done.loading": "Loading …",
     "done.downloadIntro": "This browser cannot share files. Download them instead:",
     "thumbs.label": "Pictures in the pack",
@@ -146,6 +148,8 @@ const I18N = {
     "done.open": "Beitrag öffnen",
     "done.textTitle": "Text, der mitgeteilt wird",
     "done.new": "Weiteren Beitrag aufbereiten",
+    "done.incompleteTitle": "Dieses Paket ist unvollständig",
+    "done.incompleteBody": "Instagram oder Facebook hat das Herunterladen vorzeitig abgebrochen, der Beitrag hat womöglich mehr Bilder als diese. Bereite ihn später erneut auf, um den Rest zu bekommen.",
     "done.loading": "Lädt …",
     "done.downloadIntro": "Dieser Browser kann keine Dateien teilen. Lade sie stattdessen herunter:",
     "thumbs.label": "Bilder im Paket",
@@ -492,6 +496,10 @@ async function renderDone(job) {
   const r = job.result;
   const m = r.meta;
   const platform = PLATFORMS[m.platform] || m.platform;
+
+  // Only part of the post arrived: say so, and offer to prepare it again.
+  $("incomplete-alert").hidden = !r.incomplete;
+  $("btn-incomplete-retry").onclick = () => startJob({ url: job.url, force: true });
 
   $("result-title").textContent = m.author ? t("done.titleAuthor", { a: m.author })
     : m.author_name ? t("done.titleName", { a: m.author_name })

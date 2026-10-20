@@ -195,6 +195,7 @@ Sharewerk is a tool for personal use: it saves you from taking screenshots of po
 | Login required, or `"cookies":"expired"` in `/healthz` | Cookies missing or expired | Export new cookies; the state turns `unknown` as soon as the file is written, `ok` after the next Instagram download |
 | Download failed | Downloader outdated | Pull or rebuild the image |
 | Too many requests | Rate limit on the account | Wait, then try again |
+| This pack is incomplete | The download stopped after some items, often at a rate limit; you get what arrived, and `post.txt` says so | Prepare the post again later for the rest |
 | Not in share menu | App not installed | Install from Chrome's menu |
 | Transcript says "music only" | No speech in the audio | Expected for music reels |
 | The server could not save the post | Data volume full or read-only | Free up space, then prepare the post again |

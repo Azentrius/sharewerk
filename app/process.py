@@ -356,6 +356,11 @@ def render_text(result: FetchResult, pack: Pack, compact: bool, settings: Settin
     if n_vid:
         parts.append(f"{n_vid} video{'s' if n_vid != 1 else ''}")
     lines.append(f"Contents: {', '.join(parts) or 'nothing'}")
+    if result.incomplete:
+        lines.append(
+            f"Incomplete: the download stopped early ({result.incomplete}); "
+            "the post may have more items than these."
+        )
     lines.append("")
 
     if pack.visuals:

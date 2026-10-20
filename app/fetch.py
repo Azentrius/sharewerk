@@ -30,12 +30,14 @@ DOWNLOAD_TIMEOUT = 300
 
 
 class FetchError(RuntimeError):
-    """Download failed. `code` is a stable identifier the UI translates."""
+    """Download failed. `code` is a stable identifier the UI translates. `partial` holds what
+    did arrive when the tool failed after some files."""
 
-    def __init__(self, code: str, detail: str = ""):
+    def __init__(self, code: str, detail: str = "", partial: FetchResult | None = None):
         super().__init__(detail or code)
         self.code = code
         self.detail = detail
+        self.partial = partial
 
 
 @dataclass
@@ -62,6 +64,7 @@ class FetchResult:
     meta: PostMeta
     tool: str
     notes: list[str] = field(default_factory=list)
+    incomplete: str = ""  # the error that stopped the download early; "" when it is complete
 
 
 def classify_error(output: str) -> str:
@@ -115,20 +118,29 @@ def _media_files(directory: Path) -> list[Path]:
     )
 
 
-def _check(tool: str, proc: subprocess.CompletedProcess[str], files: list[Path]) -> None:
-    """Raise FetchError unless the tool finished cleanly with at least one file.
+def _failure(tool: str, proc: subprocess.CompletedProcess[str], files: list[Path]) -> FetchError | None:
+    """The error, unless the tool finished cleanly with at least one file.
 
     A non-zero exit status after some files means items of the post are missing, so it is a
-    failure too (and the caller tries the other tool). The configured limits (--range,
-    --playlist-items, the maximum file size) end with status 0 in both tools.
+    failure too (and the caller tries the other tool, then hands out the files that did arrive,
+    marked incomplete). The configured limits (--range, --playlist-items, the maximum file size)
+    end with status 0 in both tools.
     """
     if proc.returncode == 0 and files:
-        return
+        return None
     output = proc.stderr + proc.stdout
     detail = _tail(output)
     if proc.returncode != 0:
         detail = f"{tool} ended with exit status {proc.returncode} after {len(files)} file(s)\n{detail}"
-    raise FetchError(classify_error(output), detail.strip())
+    return FetchError(classify_error(output), detail.strip())
+
+
+def _finish(result: FetchResult, failure: FetchError | None) -> FetchResult:
+    """The result, or the failure with the result attached as what did arrive."""
+    if failure:
+        failure.partial = result
+        raise failure
+    return result
 
 
 def _kind(path: Path) -> str:
@@ -177,7 +189,9 @@ def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Se
 
     proc = _run(cmd, cwd=raw)
     files = _media_files(raw)
-    _check("gallery-dl", proc, files)
+    failure = _failure("gallery-dl", proc, files)
+    if failure and not files:
+        raise failure
 
     entries = []
     for path in files:
@@ -203,7 +217,7 @@ def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Se
         title=_first(first, "title"),
     )
     items = [MediaItem(path, _kind(path), i + 1) for i, (_, _, path, _) in enumerate(entries)]
-    return FetchResult(items, meta, "gallery-dl")
+    return _finish(FetchResult(items, meta, "gallery-dl"), failure)
 
 
 # ------------------------------------------------------------------------- yt-dlp
@@ -232,7 +246,9 @@ def run_yt_dlp(target: Target, raw: Path, cookies: Path | None, settings: Settin
 
     proc = _run(cmd, cwd=raw)
     files = _media_files(raw)
-    _check("yt-dlp", proc, files)
+    failure = _failure("yt-dlp", proc, files)
+    if failure and not files:
+        raise failure
 
     infos: dict[str, dict] = {}
     for info_path in raw.glob("*.info.json"):
@@ -253,7 +269,7 @@ def run_yt_dlp(target: Target, raw: Path, cookies: Path | None, settings: Settin
     if meta.author_name == meta.author:
         meta.author_name = ""
     items = [MediaItem(path, _kind(path), i + 1) for i, path in enumerate(files)]
-    return FetchResult(items, meta, "yt-dlp")
+    return _finish(FetchResult(items, meta, "yt-dlp"), failure)
 
 
 # ------------------------------------------------------------------------ public
@@ -262,12 +278,29 @@ def _tail(text: str, lines: int = 6) -> str:
     return "\n".join(text.strip().splitlines()[-lines:])
 
 
+def _set_aside(result: FetchResult, directory: Path) -> None:
+    """Move a partial download (media and metadata) out of the way of the next tool."""
+    shutil.rmtree(directory, ignore_errors=True)
+    directory.mkdir(parents=True)
+    source = result.items[0].path.parent
+    for path in source.iterdir():
+        if path.is_file():
+            shutil.move(str(path), str(directory / path.name))
+    for item in result.items:
+        item.path = directory / item.path.name
+
+
 def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
     """Download into workdir/raw. Cookies are copied per job and deleted after,
-    because both tools write updated cookies back into the file they were given."""
+    because both tools write updated cookies back into the file they were given.
+
+    When both tools stop with an error after some files, the bigger of these partial downloads
+    is the result, marked `incomplete` with the error's code: a part of a carousel is still
+    useful, and the page and the text say that it is not the whole post."""
     workdir = workdir.resolve()  # the tools run in raw; relative paths would point below it
     raw = workdir / "raw"
     raw.mkdir(parents=True, exist_ok=True)
+    partial = workdir / "partial"
 
     cookies: Path | None = None
     if settings.cookies_file.is_file():
@@ -281,6 +314,7 @@ def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
         else [run_yt_dlp, run_gallery_dl]
     )
     errors: list[FetchError] = []
+    best: FetchError | None = None  # the failure with the most files; they wait in `partial`
     try:
         for runner in order:
             for leftover in raw.iterdir():
@@ -290,15 +324,29 @@ def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
                 result = runner(target, raw, cookies, settings)
                 if errors:
                     result.notes.append(f"first tool failed: {errors[0].code}")
+                shutil.rmtree(partial, ignore_errors=True)
                 return result
             except FetchError as exc:
                 log.warning("%s failed for %s: %s", runner.__name__, target.url, exc.detail)
                 errors.append(exc)
+                if exc.partial and (best is None or len(exc.partial.items) > len(best.partial.items)):
+                    _set_aside(exc.partial, partial)
+                    best = exc
             except subprocess.TimeoutExpired:
                 errors.append(FetchError("timeout", f"{runner.__name__} timed out"))
     finally:
         if cookies and cookies.exists():
             cookies.unlink()
+
+    if best is not None:
+        for leftover in raw.iterdir():  # a smaller partial download of the other tool
+            if leftover.is_file():
+                leftover.unlink()
+        result = best.partial
+        result.incomplete = best.code
+        result.notes.append(f"incomplete: {best.code}")
+        log.warning("only part of %s arrived (%d item(s), %s)", target.url, len(result.items), best.code)
+        return result
 
     # Prefer the most telling error: an auth problem explains most other failures.
     codes = [e.code for e in errors]
