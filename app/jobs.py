@@ -27,6 +27,11 @@ from .urls import Target
 log = logging.getLogger(__name__)
 
 TERMINAL = {"done", "error"}
+STORAGE_FAILED = "storage_failed"
+
+
+class StorageError(OSError):
+    """job.json could not be written (full disk, read-only volume ...)."""
 
 
 @dataclass
@@ -86,7 +91,7 @@ def manifest(job: Job, fetched: FetchResult, pack, workdir: Path) -> dict:
     for item in originals(fetched.items):
         served = f"original-{item.index:02d}{item.path.suffix.lower()}"
         files[served] = {
-            "path": str(item.path.relative_to(workdir)),
+            "path": str(item.path.resolve().relative_to(workdir.resolve())),
             "name": f"{base}-{item.index:02d}{item.path.suffix.lower()}",
             "type": mime_for(item.path.name),
             "size": item.path.stat().st_size,
@@ -127,6 +132,11 @@ def manifest(job: Job, fetched: FetchResult, pack, workdir: Path) -> dict:
 
 
 class JobStore:
+    # After job.json could not be written, the worker pauses before the next job: RETRY_DELAY
+    # seconds, doubled with every further failure in a row, at most MAX_DELAY. No job is retried.
+    RETRY_DELAY = 2.0
+    MAX_DELAY = 60.0
+
     def __init__(self, settings: Settings, runner: Runner = default_runner):
         self.settings = settings
         self.runner = runner
@@ -135,6 +145,8 @@ class JobStore:
         self._queue: queue.Queue[str] = queue.Queue()
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
+        self._worker: threading.Thread | None = None
+        self._storage_failures = 0  # jobs in a row whose state could not be saved
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -144,6 +156,7 @@ class JobStore:
             t = threading.Thread(target=target, name=name, daemon=True)
             t.start()
             self._threads.append(t)
+        self._worker = self._threads[0]
 
     def stop(self) -> None:
         self._stop.set()
@@ -166,20 +179,34 @@ class JobStore:
             if job.status not in TERMINAL:
                 job.status, job.stage = "error", "done"
                 job.error_code = "interrupted"
-                self._save(job)
+                try:
+                    self._save(job)
+                except StorageError as exc:
+                    # The state is right in memory. Counting the failure makes the health check
+                    # probe the volume until writing works again.
+                    self._storage_failures += 1
+                    log.error("%s", exc)
             self._jobs[job.id] = job
 
     # ------------------------------------------------------------------- public
     def submit(self, target: Target, force: bool = False) -> Job:
+        """A new job, or the pending or finished one for the same link. A new job becomes known
+        only after its job.json is saved: a failed save must leave nothing that a retry of the
+        same link would find and that never runs. Raises StorageError."""
         with self._lock:
             if not force:
                 for job in sorted(self._jobs.values(), key=lambda j: j.created, reverse=True):
                     if job.url == target.url and job.status != "error":
                         return job
             job = Job(uuid.uuid4().hex, target.url, target.platform, target.kind, target.key)
+            try:
+                self._save(job)  # creates the job's folder too
+            except StorageError as exc:
+                shutil.rmtree(self.workdir(job.id), ignore_errors=True)
+                self._storage_failures += 1
+                log.error("%s", exc)
+                raise
             self._jobs[job.id] = job
-            self.workdir(job.id).mkdir(parents=True, exist_ok=True)
-            self._save(job)
         self._queue.put(job.id)
         return job
 
@@ -202,6 +229,19 @@ class JobStore:
     def workdir(self, job_id: str) -> Path:
         return self.settings.jobs_dir / job_id
 
+    def problem(self) -> str:
+        """Why jobs cannot be processed right now, or "" if they can (for the health check)."""
+        if self._worker is None or not self._worker.is_alive():
+            return "worker_stopped"
+        if self._storage_failures:
+            probe = self.settings.jobs_dir / ".write-test"
+            try:
+                probe.write_text("ok", encoding="utf-8")
+                probe.unlink()
+            except OSError:
+                return STORAGE_FAILED
+        return ""
+
     def file_path(self, job: Job, name: str) -> tuple[Path, dict] | None:
         if not job.result:
             return None
@@ -218,10 +258,13 @@ class JobStore:
     def _save(self, job: Job) -> None:
         job.updated = time.time()
         path = self.workdir(job.id) / "job.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(job.public()), encoding="utf-8")
-        tmp.replace(path)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(job.public()), encoding="utf-8")
+            tmp.replace(path)
+        except OSError as exc:
+            raise StorageError(f"cannot save the state of job {job.id}: {exc}") from exc
 
     def _update(self, job: Job, **changes) -> None:
         with self._lock:
@@ -230,22 +273,54 @@ class JobStore:
             self._save(job)
 
     def _work(self) -> None:
+        # Nothing may end this loop but stop(): a dead worker would leave every job queued.
         while not self._stop.is_set():
             job_id = self._queue.get()
             job = self.get(job_id) if job_id else None
             if job is None:
                 continue
-            self._update(job, status="running", stage="downloading")
             try:
-                result = self.runner(job, self.workdir(job.id), self.settings, lambda s: self._update(job, stage=s))
-                self._update(job, status="done", stage="done", result=result)
-                log.info("job %s done (%s)", job.id, job.url)
-            except FetchError as exc:
-                self._update(job, status="error", stage="done", error_code=exc.code, error_detail=exc.detail[-1000:])
-                log.warning("job %s failed: %s", job.id, exc.code)
-            except Exception as exc:  # noqa: BLE001 - report, keep the worker alive
-                log.exception("job %s crashed", job.id)
-                self._update(job, status="error", stage="done", error_code="internal", error_detail=str(exc)[-1000:])
+                self._process(job)
+            except StorageError as exc:
+                self._storage_failures += 1
+                log.error("%s (%d job(s) in a row)", exc, self._storage_failures)
+                self._give_up(job, STORAGE_FAILED, str(exc))
+                pause = self.RETRY_DELAY * 2 ** (self._storage_failures - 1)
+                self._stop.wait(min(self.MAX_DELAY, pause))
+            except Exception as exc:  # noqa: BLE001 - keep the worker alive
+                log.exception("job %s: unexpected error in the worker", job.id)
+                self._give_up(job, "internal", str(exc))
+            else:
+                self._storage_failures = 0
+
+    def _process(self, job: Job) -> None:
+        self._update(job, status="running", stage="downloading")
+        try:
+            result = self.runner(job, self.workdir(job.id), self.settings, lambda s: self._update(job, stage=s))
+        except StorageError:
+            raise
+        except FetchError as exc:
+            self._update(job, status="error", stage="done", error_code=exc.code, error_detail=exc.detail[-1000:])
+            log.warning("job %s failed: %s", job.id, exc.code)
+            return
+        except Exception as exc:  # noqa: BLE001 - report it as the job's error
+            log.exception("job %s crashed", job.id)
+            self._update(job, status="error", stage="done", error_code="internal", error_detail=str(exc)[-1000:])
+            return
+        self._update(job, status="done", stage="done", result=result)
+        log.info("job %s done (%s)", job.id, job.url)
+
+    def _give_up(self, job: Job, code: str, detail: str) -> None:
+        """Mark a job as failed after its state could not be saved: in memory in any case, so
+        the page shows the error instead of a job that stays queued, running or seemingly done."""
+        with self._lock:
+            if job.status != "error":  # a job that failed anyway keeps its own reason
+                job.status, job.error_code, job.error_detail, job.result = "error", code, detail[-1000:], None
+            job.stage = "done"
+            try:
+                self._save(job)
+            except StorageError:
+                pass  # already logged; job.json keeps the older state until a restart marks it interrupted
 
     def _janitor(self) -> None:
         while not self._stop.wait(1800):

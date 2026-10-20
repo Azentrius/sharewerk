@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from .config import Settings, load_settings
-from .jobs import JobStore, Runner, default_runner
+from .jobs import STORAGE_FAILED, JobStore, Runner, StorageError, default_runner
 from .urls import UrlError, target_from_shared
 
 # Login page texts, "du" as in all own Azentrius apps. Buttons are verb plus object.
@@ -143,8 +143,12 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
         return FileResponse(STATIC / "icons" / "icon-192.png", media_type="image/png")
 
     @app.get("/healthz", include_in_schema=False)
-    def healthz() -> dict:
-        return {"ok": True}
+    def healthz() -> Response:
+        # 503 when jobs cannot be processed: the worker stopped, or job states cannot be saved.
+        problem = store.problem()
+        if problem:
+            return JSONResponse({"ok": False, "problem": problem}, status_code=503)
+        return JSONResponse({"ok": True})
 
     @app.get("/login", include_in_schema=False)
     def login_page(request: Request, error: str = "") -> Response:
@@ -206,7 +210,10 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             target = target_from_shared(body.url, body.text, body.title, allowed_hosts=settings.allowed_hosts)
         except UrlError as exc:
             raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
-        job = store.submit(target, force=body.force)
+        try:
+            job = store.submit(target, force=body.force)
+        except StorageError as exc:
+            raise HTTPException(status_code=503, detail={"code": STORAGE_FAILED, "message": str(exc)}) from exc
         return job_view(job)
 
     @app.get("/api/jobs")
