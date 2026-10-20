@@ -48,20 +48,32 @@ class Job:
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
     result: dict | None = None
+    # Percent of the current stage, only while transcribing. Kept in memory for the page that
+    # polls the job and left out of job.json: not worth a write, and older versions would not
+    # load a job.json with an unknown field.
+    progress: int | None = None
 
     def public(self) -> dict:
         data = asdict(self)
         return data
 
+    def persisted(self) -> dict:
+        data = self.public()
+        del data["progress"]
+        return data
 
-Runner = Callable[[Job, Path, Settings, Callable[[str], None]], dict]
+
+# set_stage(stage) saves the job; set_stage(stage, fraction) only updates its progress.
+Runner = Callable[[Job, Path, Settings, Callable[..., None]], dict]
 
 
-def default_runner(job: Job, workdir: Path, settings: Settings, set_stage: Callable[[str], None]) -> dict:
+def default_runner(job: Job, workdir: Path, settings: Settings, set_stage: Callable[..., None]) -> dict:
     target = Target(job.url, job.platform, job.kind, job.key)
     set_stage("downloading")
     fetched = fetch(target, workdir, settings)
-    pack = build_pack(fetched, workdir, settings, on_stage=set_stage)
+    pack = build_pack(
+        fetched, workdir, settings, on_stage=set_stage, on_progress=lambda f: set_stage("transcribing", f)
+    )
     return manifest(job, fetched, pack, workdir)
 
 
@@ -313,16 +325,24 @@ class JobStore:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(job.public()), encoding="utf-8")
+            tmp.write_text(json.dumps(job.persisted()), encoding="utf-8")
             tmp.replace(path)
         except OSError as exc:
             raise StorageError(f"cannot save the state of job {job.id}: {exc}") from exc
 
     def _update(self, job: Job, **changes) -> None:
         with self._lock:
+            if "stage" in changes:
+                job.progress = None  # a new stage starts from nothing
             for k, v in changes.items():
                 setattr(job, k, v)
             self._save(job)
+
+    def _set_stage(self, job: Job, stage: str, fraction: float | None = None) -> None:
+        if fraction is not None and stage == job.stage:
+            job.progress = max(0, min(100, round(fraction * 100)))  # in memory only
+            return
+        self._update(job, stage=stage)
 
     def _work(self) -> None:
         # Nothing may end this loop but stop(): a dead worker would leave every job queued.
@@ -352,7 +372,9 @@ class JobStore:
                 return  # shutting down; a restart marks the job interrupted
         self._update(job, status="running", stage="downloading")
         try:
-            result = self.runner(job, self.workdir(job.id), self.settings, lambda s: self._update(job, stage=s))
+            result = self.runner(
+                job, self.workdir(job.id), self.settings, lambda stage, fraction=None: self._set_stage(job, stage, fraction)
+            )
         except StorageError:
             raise
         except FetchError as exc:
