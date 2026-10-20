@@ -107,6 +107,14 @@
 
   <!-- Result -->
   <main id="view-done" class="sw-view" hidden>
+    <div id="incomplete-alert" class="az-alert az-alert--warning" role="status" hidden>
+      <span class="az-alert__icon" data-icon="exclamation-circle"></span>
+      <p class="az-alert__title" data-i18n="done.incompleteTitle"></p>
+      <p class="az-alert__body" data-i18n="done.incompleteBody"></p>
+      <div class="az-alert__actions">
+        <button class="az-btn az-btn--link az-btn--sm" id="btn-incomplete-retry" type="button" data-i18n="error.retry"></button>
+      </div>
+    </div>
     <section class="az-card" aria-labelledby="result-title">
       <div class="az-card__header">
         <div>

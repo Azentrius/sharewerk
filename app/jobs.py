@@ -128,6 +128,7 @@ def manifest(job: Job, fetched: FetchResult, pack, workdir: Path) -> dict:
         "transcript_preview": transcript[:600],
         "tool": fetched.tool,
         "notes": fetched.notes,
+        "incomplete": fetched.incomplete,
     }
 
 

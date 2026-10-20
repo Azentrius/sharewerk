@@ -26,7 +26,10 @@ def fake_fetch(monkeypatch):
         raw.mkdir(parents=True, exist_ok=True)
         items = [MediaItem(make_image(raw / f"{i:02d}.jpg", f"slide {i}"), "image", i) for i in range(1, 4)]
         meta = PostMeta("instagram", target.url, author="examplecreator", caption="Five tips", date="2026-10-09")
-        return FetchResult(items, meta, "fake")
+        result = FetchResult(items, meta, "fake")
+        if "PARTIAL" in target.url:  # the download stopped after these three items
+            result.incomplete = "rate_limited"
+        return result
 
     monkeypatch.setattr(jobs_module, "fetch", _fetch)
     return calls
@@ -185,3 +188,12 @@ def test_manifest_describes_each_picture(authed):
     job = wait_done(authed, authed.post("/api/jobs", json={"text": POST}).json()["id"])
     pic = job["result"]["files"]["02.jpg"]
     assert (pic["number"], pic["kind"], pic["item"], pic["time"]) == (2, "image", 2, None)
+    assert job["result"]["incomplete"] == ""
+
+
+def test_an_incomplete_pack_says_so_in_the_result_and_the_text(authed):
+    job = wait_done(authed, authed.post("/api/jobs", json={"url": "https://www.instagram.com/p/PARTIAL/"}).json()["id"])
+    assert job["status"] == "done"
+    assert job["result"]["incomplete"] == "rate_limited"
+    text = authed.get(f"/api/jobs/{job['id']}/files/post.txt").text
+    assert "Incomplete:" in text and "rate_limited" in text
