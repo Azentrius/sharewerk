@@ -132,7 +132,7 @@ def test_health_reports_storage_failures_and_recovers(settings, disk):
     with TestClient(create_app(settings, runner=runner), base_url="https://testserver") as client:
         client.headers["Authorization"] = f"Bearer {TOKEN}"
         store = client.app.state.store
-        assert client.get("/healthz").json() == {"ok": True}
+        assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
 
         job_id = client.post("/api/jobs", json={"url": "https://www.instagram.com/p/WAIT/"}).json()["id"]
         disk.full = True  # the disk fills up while the post is being prepared
@@ -146,7 +146,7 @@ def test_health_reports_storage_failures_and_recovers(settings, disk):
         assert health.json()["ok"] is False
 
         disk.full = False  # space was freed
-        assert client.get("/healthz").json() == {"ok": True}
+        assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
         again = client.post("/api/jobs", json={"url": "https://www.instagram.com/p/second/"}).json()["id"]
         assert finished(store, again).status == "done"
 
@@ -170,10 +170,10 @@ def test_restart_while_storage_still_fails_is_unhealthy_until_it_works(settings,
 
         health = client.get("/healthz")
         assert health.status_code == 503
-        assert health.json() == {"ok": False, "problem": "storage_failed"}
+        assert health.json() == {"ok": False, "problem": "storage_failed", "cookies": "missing"}
 
         disk.full = False  # space was freed, no restart
-        assert client.get("/healthz").json() == {"ok": True}
+        assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
         job_id = client.post("/api/jobs", json={"url": "https://www.instagram.com/p/after/"}).json()["id"]
         assert finished(client.app.state.store, job_id).status == "done"
 
@@ -191,14 +191,14 @@ def test_failed_submit_leaves_no_job_behind_and_the_retry_is_processed(settings,
         assert failed.json()["detail"]["code"] == "storage_failed"
         assert client.get("/api/jobs").json() == []  # nothing that waits forever
         assert [p for p in settings.jobs_dir.iterdir() if p.is_dir()] == []
-        assert client.get("/healthz").json() == {"ok": False, "problem": "storage_failed"}
+        assert client.get("/healthz").json() == {"ok": False, "problem": "storage_failed", "cookies": "missing"}
 
         disk.full = False
         retry = client.post("/api/jobs", json={"url": url})  # the same link, without force
         assert retry.status_code == 200
         job = finished(store, retry.json()["id"])
         assert job.status == "done"
-        assert client.get("/healthz").json() == {"ok": True}
+        assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
 
 
 def test_duplicates_of_running_and_finished_jobs_are_still_reused(store):

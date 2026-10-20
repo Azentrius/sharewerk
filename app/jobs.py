@@ -147,6 +147,8 @@ class JobStore:
         self._threads: list[threading.Thread] = []
         self._worker: threading.Thread | None = None
         self._storage_failures = 0  # jobs in a row whose state could not be saved
+        # What the last Instagram download said about the cookies ("ok" or "expired"), and when.
+        self._cookies: tuple[str, float] = ("unknown", 0.0)
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -187,6 +189,7 @@ class JobStore:
                     self._storage_failures += 1
                     log.error("%s", exc)
             self._jobs[job.id] = job
+            self._note_cookies(job)  # so a restart keeps an "expired" alert
 
     # ------------------------------------------------------------------- public
     def submit(self, target: Target, force: bool = False) -> Job:
@@ -228,6 +231,32 @@ class JobStore:
 
     def workdir(self, job_id: str) -> Path:
         return self.settings.jobs_dir / job_id
+
+    def cookie_state(self) -> str:
+        """The cookies as the last Instagram download saw them, for the health check: "ok",
+        "expired" (it asked for a login), "missing" (no cookie file) or "unknown" (no Instagram
+        download since the cookie file was last written)."""
+        try:
+            written = self.settings.cookies_file.stat().st_mtime
+        except OSError:
+            return "missing"
+        state, when = self._cookies
+        if state != "unknown" and written > when:
+            return "unknown"  # new cookies, not tried yet
+        return state
+
+    def _note_cookies(self, job: Job) -> None:
+        # Only Instagram needs the cookies; a Facebook login error says nothing about them.
+        if job.platform != "instagram":
+            return
+        if job.status == "done":
+            state = "ok"
+        elif job.status == "error" and job.error_code == "auth_required":
+            state = "expired"
+        else:
+            return
+        if job.updated >= self._cookies[1]:
+            self._cookies = (state, job.updated)
 
     def problem(self) -> str:
         """Why jobs cannot be processed right now, or "" if they can (for the health check)."""
@@ -301,6 +330,7 @@ class JobStore:
             raise
         except FetchError as exc:
             self._update(job, status="error", stage="done", error_code=exc.code, error_detail=exc.detail[-1000:])
+            self._note_cookies(job)
             log.warning("job %s failed: %s", job.id, exc.code)
             return
         except Exception as exc:  # noqa: BLE001 - report it as the job's error
@@ -308,6 +338,7 @@ class JobStore:
             self._update(job, status="error", stage="done", error_code="internal", error_detail=str(exc)[-1000:])
             return
         self._update(job, status="done", stage="done", result=result)
+        self._note_cookies(job)
         log.info("job %s done (%s)", job.id, job.url)
 
     def _give_up(self, job: Job, code: str, detail: str) -> None:

@@ -130,7 +130,14 @@ routes:
                 is: you@example.com
 ```
 
-Sharewerk answers `GET /healthz` with `{"ok":true}`. Pomerium, however, answers `/healthz` and `/ping` itself, so a monitor on those paths only shows that Pomerium is up. The first route passes `/health` to Sharewerk's `/healthz` without a login; point your monitor there and check for `"ok":true`. Everything else stays behind the policy. Keep the public route first, because Pomerium uses the first route that matches. The longer `timeout` gives large files time to download over a slow connection; Pomerium's default is 30 seconds.
+Sharewerk answers `GET /healthz` with `{"ok":true,"cookies":"ok"}`. Pomerium, however, answers `/healthz` and `/ping` itself, so a monitor on those paths only shows that Pomerium is up. The first route passes `/health` to Sharewerk's `/healthz` without a login; point your monitor there and check for `"ok":true`. Everything else stays behind the policy. Keep the public route first, because Pomerium uses the first route that matches. The longer `timeout` gives large files time to download over a slow connection; Pomerium's default is 30 seconds.
+
+The health check has two parts:
+
+- `"ok"` is `false` (with HTTP 503) when posts cannot be processed at all: `worker_stopped` or `storage_failed` in `"problem"`.
+- `"cookies"` says what the last Instagram download found: `ok`, `expired` (Instagram asked for a login), `missing` (no cookie file) or `unknown` (no Instagram download since the cookie file was last written, e.g. right after you exported new cookies). It never turns the check red, because Facebook works without cookies.
+
+For a warning when the cookies run out, add a second keyword monitor on the same URL that alerts when it finds `"cookies":"expired"` (in Uptime Kuma: keyword monitor with "Invert Keyword"). After a restart the state comes from the jobs still kept (`SHAREWERK_RETENTION_HOURS`).
 
 ## Updating
 
@@ -184,7 +191,7 @@ Sharewerk is a tool for personal use: it saves you from taking screenshots of po
 
 | Message | Usual cause | Fix |
 |---|---|---|
-| Login required | Cookies missing or expired | Export new cookies |
+| Login required, or `"cookies":"expired"` in `/healthz` | Cookies missing or expired | Export new cookies; the state turns `unknown` as soon as the file is written, `ok` after the next Instagram download |
 | Download failed | Downloader outdated | Pull or rebuild the image |
 | Too many requests | Rate limit on the account | Wait, then try again |
 | Not in share menu | App not installed | Install from Chrome's menu |

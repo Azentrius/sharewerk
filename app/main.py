@@ -145,10 +145,13 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> Response:
         # 503 when jobs cannot be processed: the worker stopped, or job states cannot be saved.
+        # The cookie state never fails the check (Facebook works without cookies); a monitor
+        # can watch for "cookies":"expired" on its own.
         problem = store.problem()
+        cookies = store.cookie_state()
         if problem:
-            return JSONResponse({"ok": False, "problem": problem}, status_code=503)
-        return JSONResponse({"ok": True})
+            return JSONResponse({"ok": False, "problem": problem, "cookies": cookies}, status_code=503)
+        return JSONResponse({"ok": True, "cookies": cookies})
 
     @app.get("/login", include_in_schema=False)
     def login_page(request: Request, error: str = "") -> Response:
