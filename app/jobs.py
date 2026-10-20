@@ -285,6 +285,27 @@ class JobStore:
                 return STORAGE_FAILED
         return ""
 
+    def delete(self, job_id: str) -> str:
+        """Delete a finished or failed job with all its files now, not only after
+        SHAREWERK_RETENTION_HOURS. Returns "" when it is gone, else why not: "job_not_found" or
+        "job_busy" (queued or running: the worker may be using its files). Raises StorageError
+        when the files cannot be removed; the job then stays listed."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return "job_not_found"
+            if job.status not in TERMINAL:
+                return "job_busy"
+            try:
+                shutil.rmtree(self.workdir(job_id))
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise StorageError(f"cannot delete job {job_id}: {exc}") from exc
+            del self._jobs[job_id]
+        log.info("job %s deleted", job_id)
+        return ""
+
     def file_path(self, job: Job, name: str) -> tuple[Path, dict] | None:
         if not job.result:
             return None

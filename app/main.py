@@ -234,6 +234,16 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             raise HTTPException(status_code=404, detail={"code": "job_not_found"})
         return job_view(job)
 
+    @app.delete("/api/jobs/{job_id}")
+    def delete_job(job_id: str) -> dict:
+        try:
+            refused = store.delete(job_id)
+        except StorageError as exc:
+            raise HTTPException(status_code=503, detail={"code": STORAGE_FAILED, "message": str(exc)}) from exc
+        if refused:
+            raise HTTPException(status_code=404 if refused == "job_not_found" else 409, detail={"code": refused})
+        return {"deleted": job_id}
+
     @app.get("/api/jobs/{job_id}/files/{name}")
     def get_file(job_id: str, name: str) -> FileResponse:
         job = store.get(job_id)

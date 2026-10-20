@@ -35,6 +35,19 @@ class Element {
     for (const listener of this.listeners.click || []) listener({ preventDefault() {} });
     return this.onclick ? this.onclick() : undefined;
   }
+  focus() { Element.focused = this; }
+}
+
+// Every element below `root` (rows, cells, buttons built with createElement) that matches.
+function findAll(root, match) {
+  const found = [];
+  for (const child of root.children || []) {
+    if (child instanceof Element) {
+      if (match(child)) found.push(child);
+      found.push(...findAll(child, match));
+    }
+  }
+  return found;
 }
 
 function deferred() {
@@ -77,14 +90,18 @@ function response(body, type, status = 200) {
 }
 
 // jobs: finished jobs the server knows; created: the answer to POST /api/jobs as [status, body];
-// language: the browser language.
-function loadApp(jobs, { created, language = "en" } = {}) {
+// language: the browser language; list: the rows of GET /api/jobs; deletion: the answer to
+// DELETE /api/jobs/<id> as [status, body] (default: deleted).
+function loadApp(jobs, { created, language = "en", list = [], deletion } = {}) {
   const elements = new Map();
   const requests = [];
   const holds = [];
   const shared = [];
   const copied = [];
   const posted = []; // bodies of POST /api/jobs
+  const deleted = []; // job ids of DELETE /api/jobs/<id>
+  const keyListeners = [];
+  let rows = [...list];
 
   async function fetch(url, options = {}) {
     requests.push(url);
@@ -96,8 +113,15 @@ function loadApp(jobs, { created, language = "en" } = {}) {
       const [status, body] = created;
       return response(JSON.stringify(body), "application/json", status);
     }
+    if (options.method === "DELETE") {
+      const id = url.split("/").pop();
+      deleted.push(id);
+      const [status, body] = deletion || [200, { deleted: id }];
+      if (status === 200) rows = rows.filter((r) => r.id !== id);
+      return response(JSON.stringify(body), "application/json", status);
+    }
     if (url === "/api/config") return response(JSON.stringify({ version: "0.1.0", retention_hours: 24 }), "application/json");
-    if (url === "/api/jobs") return response("[]", "application/json");
+    if (url === "/api/jobs") return response(JSON.stringify(rows), "application/json");
     for (const job of Object.values(jobs)) {
       if (url === `/api/jobs/${job.id}`) return response(JSON.stringify(job), "application/json");
       for (const name of Object.keys(job.result.files)) {
@@ -118,6 +142,7 @@ function loadApp(jobs, { created, language = "en" } = {}) {
       },
       createElement: () => new Element(),
       querySelectorAll: () => [],
+      addEventListener(type, listener) { if (type === "keydown") keyListeners.push(listener); },
     },
     navigator: {
       language,
@@ -141,6 +166,9 @@ function loadApp(jobs, { created, language = "en" } = {}) {
     shared,
     copied,
     posted,
+    deleted,
+    requests,
+    key(name) { for (const listener of keyListeners) listener({ key: name, preventDefault() {} }); },
     // Answers the nth request to a URL only when the returned function is called.
     hold(url, nth = 1) {
       const gate = deferred();
@@ -271,6 +299,63 @@ test("a job waiting for the Instagram pause says why", async () => {
     assert.equal(text, app.run('I18N[LANG]["step.waiting"]'));
     assert.notEqual(text, app.run('t("step.processing")'));
   }
+});
+
+const row = (id, status) => ({
+  id, url: `https://www.instagram.com/p/${id}/`, platform: "instagram", status, author: `author${id}`,
+  created: Date.now() / 1000 - 60,
+});
+
+function deleteButtons(app) {
+  const label = app.run('t("recent.delete")');
+  return findAll(app.element("recent"), (el) => el.attributes["aria-label"] === label);
+}
+
+test("a finished result is deleted after confirming, a running one has no delete button", async () => {
+  const app = loadApp({}, { list: [row("A", "done"), row("B", "running")] });
+  await app.settle();
+  const buttons = deleteButtons(app);
+  assert.equal(buttons.length, 1); // only the finished job
+
+  buttons[0].click();
+  await app.settle();
+  assert.equal(app.element("delete-dialog").hidden, false);
+  assert.match(app.element("delete-text").textContent, /@authorA/);
+  assert.deepEqual(app.deleted, []); // nothing happens before the confirmation
+
+  app.element("delete-confirm").click();
+  await app.settle();
+  assert.deepEqual(app.deleted, ["A"]);
+  assert.equal(app.element("delete-dialog").hidden, true);
+  assert.equal(app.element("page-alert").querySelector(".az-alert__title").textContent, app.run('t("alert.deletedTitle")'));
+  assert.equal(deleteButtons(app).length, 0); // the list was loaded again without A
+});
+
+test("cancel and Escape close the delete dialog without deleting", async () => {
+  const app = loadApp({}, { list: [row("A", "done")] });
+  await app.settle();
+  deleteButtons(app)[0].click();
+  app.element("delete-cancel").click();
+  assert.equal(app.element("delete-dialog").hidden, true);
+
+  deleteButtons(app)[0].click();
+  assert.equal(app.element("delete-dialog").hidden, false);
+  app.key("Escape");
+  assert.equal(app.element("delete-dialog").hidden, true);
+  await app.settle();
+  assert.deepEqual(app.deleted, []);
+});
+
+test("a result that is still being prepared says why it was not deleted", async () => {
+  const app = loadApp({}, { list: [row("A", "done")], deletion: [409, { detail: { code: "job_busy" } }] });
+  await app.settle();
+  deleteButtons(app)[0].click();
+  app.element("delete-confirm").click();
+  await app.settle();
+  const alert = app.element("page-alert");
+  assert.equal(alert.querySelector(".az-alert__title").textContent, app.run('t("alert.deleteFailedTitle")'));
+  assert.equal(alert.querySelector(".az-alert__body").textContent, app.run('t("alert.deleteBusyBody")'));
+  assert.equal(deleteButtons(app).length, 1);
 });
 
 test("the transcription shows how far it is", async () => {

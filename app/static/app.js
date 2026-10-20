@@ -18,6 +18,12 @@ const I18N = {
     "recent.time": "Time",
     "recent.actions": "Actions",
     "recent.open": "Open result",
+    "recent.delete": "Delete result",
+    "delete.title": "Delete result?",
+    "delete.body": "The result of {post} and its files are deleted from the server now, instead of after {h} hours.",
+    "delete.confirm": "Delete",
+    "delete.cancel": "Cancel",
+    "delete.close": "Close",
     "recent.emptyTitle": "No posts prepared yet",
     "recent.emptyBody": "Share a post from Instagram or Facebook to Sharewerk, or paste its link above. Results stay here for {h} hours.",
     "status.queued": "Waiting",
@@ -73,6 +79,11 @@ const I18N = {
     "alert.cannotShareBody": "Download them with the links in the first card.",
     "alert.loadFailedTitle": "The files could not be loaded",
     "alert.loadFailedBody": "Check the connection and tap the button again.",
+    "alert.deletedTitle": "Result deleted",
+    "alert.deletedBody": "Its files are gone from the server.",
+    "alert.deleteFailedTitle": "The result could not be deleted",
+    "alert.deleteBusyBody": "It is still being prepared. Try again when it is ready.",
+    "alert.deleteFailedBody": "Check the connection and try again.",
     "error.post": "Post:",
     "error.retry": "Prepare post again",
     "field.no_url": "Paste a link that starts with https://.",
@@ -118,6 +129,12 @@ const I18N = {
     "recent.time": "Zeit",
     "recent.actions": "Aktionen",
     "recent.open": "Ergebnis öffnen",
+    "recent.delete": "Ergebnis löschen",
+    "delete.title": "Ergebnis löschen?",
+    "delete.body": "Das Ergebnis von {post} und seine Dateien werden jetzt vom Server gelöscht, statt erst nach {h} Stunden.",
+    "delete.confirm": "Löschen",
+    "delete.cancel": "Abbrechen",
+    "delete.close": "Schließen",
     "recent.emptyTitle": "Noch keine Beiträge aufbereitet",
     "recent.emptyBody": "Teile einen Beitrag aus Instagram oder Facebook an Sharewerk oder füge oben seinen Link ein. Ergebnisse bleiben {h} Stunden hier.",
     "status.queued": "Wartet",
@@ -173,6 +190,11 @@ const I18N = {
     "alert.cannotShareBody": "Lade sie über die Links in der ersten Karte herunter.",
     "alert.loadFailedTitle": "Die Dateien konnten nicht geladen werden",
     "alert.loadFailedBody": "Prüfe die Verbindung und tippe noch einmal auf den Button.",
+    "alert.deletedTitle": "Ergebnis gelöscht",
+    "alert.deletedBody": "Seine Dateien sind vom Server entfernt.",
+    "alert.deleteFailedTitle": "Das Ergebnis konnte nicht gelöscht werden",
+    "alert.deleteBusyBody": "Es wird gerade noch aufbereitet. Versuch es erneut, wenn es fertig ist.",
+    "alert.deleteFailedBody": "Prüfe die Verbindung und versuch es erneut.",
     "error.post": "Beitrag:",
     "error.retry": "Beitrag erneut aufbereiten",
     "field.no_url": "Füge einen Link ein, der mit https:// beginnt.",
@@ -413,12 +435,67 @@ function renderRecent(jobs) {
     open.setAttribute("aria-label", t("recent.open"));
     open.title = t("recent.open");
     open.append(icon("angle-right"));
+    if (job.status === "done" || job.status === "error") {
+      // A trash icon in the row; the dialog confirms (Azentrius Design System, Button and Modal).
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "az-btn az-btn--plain az-btn--sm";
+      del.setAttribute("aria-label", t("recent.delete"));
+      del.title = t("recent.delete");
+      del.append(icon("trash"));
+      del.addEventListener("click", () => askDelete(job, del));
+      actions.append(del);
+    }
     actions.append(open);
 
     tr.append(post, status, time, actions);
     body.append(tr);
   }
 }
+
+// ---------------------------------------------------------------------- delete
+let deleting = null; // { job, opener } while the dialog is open
+
+function askDelete(job, opener) {
+  deleting = { job, opener };
+  const post = job.author ? `@${job.author}` : job.url;
+  $("delete-text").textContent = t("delete.body", { post, h: config.retention_hours });
+  $("delete-close").setAttribute("aria-label", t("delete.close"));
+  $("delete-dialog").hidden = false;
+  $("delete-cancel").focus();
+}
+
+function closeDelete() {
+  $("delete-dialog").hidden = true;
+  if (deleting) deleting.opener.focus();
+  deleting = null;
+}
+
+async function confirmDelete() {
+  if (!deleting) return;
+  const { job } = deleting;
+  closeDelete();
+  try {
+    await api(`/api/jobs/${job.id}`, { method: "DELETE" });
+  } catch (error) {
+    if (error.code === "unauthorised") return;
+    const body = error.code === "job_busy" ? t("alert.deleteBusyBody") : t("alert.deleteFailedBody");
+    return showAlert("danger", t("alert.deleteFailedTitle"), body);
+  }
+  let jobs = [];
+  try {
+    jobs = await api("/api/jobs");
+  } catch { /* the list is optional */ }
+  renderRecent(jobs);
+  showAlert("success", t("alert.deletedTitle"), t("alert.deletedBody"), { autoHide: true });
+}
+
+$("delete-confirm").addEventListener("click", confirmDelete);
+$("delete-cancel").addEventListener("click", closeDelete);
+$("delete-close").addEventListener("click", closeDelete);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("delete-dialog").hidden) closeDelete();
+});
 
 $("link-form").addEventListener("submit", (event) => {
   event.preventDefault();
