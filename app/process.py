@@ -242,7 +242,11 @@ def tiles_per_sheet(n_visuals: int) -> int:
 
 # --------------------------------------------------------------------- pipeline
 
-def build_pack(result: FetchResult, workdir: Path, settings: Settings, on_stage=lambda stage: None) -> Pack:
+def build_pack(
+    result: FetchResult, workdir: Path, settings: Settings,
+    on_stage=lambda stage: None, on_progress=lambda fraction: None,
+) -> Pack:
+    """on_progress gets the share of the transcription done over all videos (0 to 1)."""
     out = workdir / "out"
     tmp = workdir / "tmp"
     out.mkdir(parents=True, exist_ok=True)
@@ -287,19 +291,29 @@ def build_pack(result: FetchResult, workdir: Path, settings: Settings, on_stage=
 
     if any(v.kind == "video" for v in result.items):
         on_stage("transcribing")
+    # Progress over all videos, weighted by the length that is transcribed of each.
+    lengths = {
+        item.index: min(probed[item.index][0] or settings.max_video_seconds, float(settings.max_video_seconds))
+        for item in videos if probed[item.index][1]
+    }
+    total = sum(lengths.values()) or 1.0
+    before = 0.0
     for item in videos:
         duration, has_audio = probed[item.index]
         limit = min(duration, float(settings.max_video_seconds)) if duration else float(settings.max_video_seconds)
         transcript = None
         if has_audio and settings.transcription_enabled:
             wav = tmp / f"audio-{item.index}.wav"
+            share = lengths[item.index] / total
             if extract_audio(item.path, wav, limit):
                 try:
-                    transcript = transcribe(wav, settings)
+                    # transcribe() runs to the end here, so the closure sees this video's values.
+                    transcript = transcribe(wav, settings, lambda f: on_progress(before + f * share))
                 except Exception:  # noqa: BLE001 - a broken transcript must not lose the pack
                     log.exception("transcription failed for item %s", item.index)
                 finally:
                     wav.unlink(missing_ok=True)
+            before += share
         pack.videos.append(VideoInfo(item.index, duration, duration > settings.max_video_seconds, transcript, has_audio))
 
     per_sheet = tiles_per_sheet(len(pack.visuals))
