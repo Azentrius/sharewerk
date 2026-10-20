@@ -273,6 +273,18 @@ test("a job waiting for the Instagram pause says why", async () => {
   }
 });
 
+test("the transcription shows how far it is", async () => {
+  for (const language of ["en", "de"]) {
+    const app = loadApp({}, { language });
+    await app.settle();
+    app.run('renderProgress({ status: "running", stage: "transcribing", progress: 40, queue_position: 0 })');
+    const text = app.element("work-step").textContent;
+    assert.equal(text, app.run('I18N[LANG]["step.transcribingPercent"]').replace("{p}", "40"));
+    app.run('renderProgress({ status: "running", stage: "transcribing", progress: null, queue_position: 0 })');
+    assert.equal(app.element("work-step").textContent, app.run('t("step.transcribing")'));
+  }
+});
+
 test("files of the job on screen are loaded once and shared from the cache", async () => {
   const app = loadApp({ A: doneJob("A") });
   await app.settle();

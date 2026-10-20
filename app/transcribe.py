@@ -52,7 +52,8 @@ def _get_model(settings: Settings):
         return _model
 
 
-def transcribe(audio: Path, settings: Settings) -> Transcript | None:
+def transcribe(audio: Path, settings: Settings, on_progress=lambda fraction: None) -> Transcript | None:
+    """on_progress gets the share of the audio done so far (0 to 1) after every segment."""
     if not settings.transcription_enabled:
         return None
     model = _get_model(settings)
@@ -64,7 +65,9 @@ def transcribe(audio: Path, settings: Settings) -> Transcript | None:
         condition_on_previous_text=False,
     )
     kept: list[tuple[float, str]] = []
-    for seg in segments:
+    for seg in segments:  # a generator: the model works while we iterate
+        if info.duration:
+            on_progress(min(1.0, float(seg.end) / info.duration))
         text = seg.text.strip()
         if not text or seg.no_speech_prob > NO_SPEECH_THRESHOLD:
             continue

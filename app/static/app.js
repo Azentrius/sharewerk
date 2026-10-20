@@ -30,6 +30,7 @@ const I18N = {
     "step.downloading": "Downloading the post …",
     "step.processing": "Preparing images and video stills …",
     "step.transcribing": "Transcribing the audio …",
+    "step.transcribingPercent": "Transcribing the audio … {p}%",
     "queue": "Position {n} in the queue",
     "done.titleAuthor": "Post by @{a}",
     "done.titleName": "Post by {a}",
@@ -129,6 +130,7 @@ const I18N = {
     "step.downloading": "Beitrag wird heruntergeladen …",
     "step.processing": "Bilder und Standbilder werden aufbereitet …",
     "step.transcribing": "Ton wird transkribiert …",
+    "step.transcribingPercent": "Ton wird transkribiert … {p} %",
     "queue": "Platz {n} in der Warteschlange",
     "done.titleAuthor": "Beitrag von @{a}",
     "done.titleName": "Beitrag von {a}",
@@ -479,7 +481,9 @@ async function poll(jobId) {
 
 function renderProgress(job) {
   const stage = job.status === "queued" ? "queued" : job.stage;
-  $("work-step").textContent = t(`step.${stage}`) === `step.${stage}` ? t("step.processing") : t(`step.${stage}`);
+  $("work-step").textContent = stage === "transcribing" && Number.isFinite(job.progress)
+    ? t("step.transcribingPercent", { p: job.progress })
+    : t(`step.${stage}`) === `step.${stage}` ? t("step.processing") : t(`step.${stage}`);
   const q = $("queue-info");
   q.hidden = !(job.queue_position > 0);
   if (job.queue_position > 0) q.textContent = t("queue", { n: job.queue_position });
