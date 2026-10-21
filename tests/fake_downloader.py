@@ -9,6 +9,7 @@ writes small synthetic media files plus metadata. Environment variables per tool
   FILES   number of media files the post has (default 0)
   EXIT    exit status (default 0)
   STDERR  text written to stderr
+  JPEG    1: gallery-dl writes real (small) JPEG images instead of placeholder bytes
 
 FAKE_LOG, if set, is a file that gets one JSON line per call: tool, working directory, arguments,
 and whether the cookies and config files given on the command line exist from there.
@@ -48,7 +49,12 @@ def main() -> int:
         directory = Path(option(args, "--directory"))
         directory.mkdir(parents=True, exist_ok=True)
         for i in range(1, min(files, limit) + 1):
-            (directory / f"post_{i}.jpg").write_bytes(b"synthetic image %d" % i)
+            if os.environ.get(prefix + "JPEG") == "1":
+                from PIL import Image
+
+                Image.new("RGB", (320, 400), (30, 60, 120 + i)).save(directory / f"post_{i}.jpg", "JPEG")
+            else:
+                (directory / f"post_{i}.jpg").write_bytes(b"synthetic image %d" % i)
             meta = {"num": i, "username": "examplecreator", "description": "Five tips"}
             (directory / f"post_{i}.jpg.json").write_text(json.dumps(meta), encoding="utf-8")
     else:

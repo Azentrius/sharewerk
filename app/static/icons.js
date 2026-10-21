@@ -21,10 +21,16 @@ const ICONS = {
 
 // Inline SVG with class az-icon: 1em, fill currentColor (Azentrius Design System, Icons).
 function icon(name) {
-  const [viewBox, d] = ICONS[name];
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("class", "az-icon");
+  if (!ICONS[name]) {
+    // An unknown name must never stop the page; an empty icon keeps the layout.
+    console.warn(`icon "${name}" is missing`);
+    svg.setAttribute("aria-hidden", "true");
+    return svg;
+  }
+  const [viewBox, d] = ICONS[name];
   svg.setAttribute("viewBox", viewBox);
   svg.setAttribute("aria-hidden", "true");
   const path = document.createElementNS(ns, "path");

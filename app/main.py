@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
+from .assets import page
 from .config import Settings, load_settings
 from .jobs import STORAGE_FAILED, JobStore, Runner, StorageError, default_runner
 from .urls import UrlError, target_from_shared
@@ -124,8 +125,10 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
         return response
 
     # ------------------------------------------------------------------ pages
-    def index() -> FileResponse:
-        return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+    index_html = page("index.html")  # script and stylesheet URLs carry their content hash
+
+    def index() -> HTMLResponse:
+        return HTMLResponse(index_html, headers={"Cache-Control": "no-cache"})
 
     app.get("/", include_in_schema=False)(index)
     app.get("/share", include_in_schema=False)(index)
@@ -167,7 +170,7 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             "error_hidden": "" if error else "hidden",
             "invalid": 'aria-invalid="true"' if error else "",
         }
-        html = (STATIC / "login.html").read_text(encoding="utf-8")
+        html = page("login.html")
         for key, value in values.items():
             safe = value if key in {"error_hidden", "invalid"} else _escape(value)
             html = html.replace("{{" + key + "}}", safe)

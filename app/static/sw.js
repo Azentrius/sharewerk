@@ -1,24 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// Minimal service worker: keeps the static app shell (CSS, JS, icons) cached so
-// the app opens instantly from the share sheet. Pages and API calls always go
-// to the network, so authentication and results are never served stale.
-const CACHE = "sharewerk-v3";
-const SHELL = [
-  "/static/theme.js",
-  "/static/azentrius/tokens.css",
-  "/static/azentrius/bundle.css",
-  "/static/azentrius/fonts/DMSans-VF.woff2",
-  "/static/azentrius/fonts/DMSerifDisplay-Regular.woff2",
-  "/static/app.css",
-  "/static/icons.js",
-  "/static/app.js",
-  "/static/icons/icon-192.png",
-  "/static/icons/sharewerk-favicon.svg",
-];
+// Minimal service worker: keeps the static app shell (CSS, JS, icons) cached so the app opens
+// instantly from the share sheet. Pages and API calls always go to the network, so
+// authentication and results are never served stale.
+// The pages ask for every script and stylesheet as /static/<file>?v=<hash of its content>
+// (app/assets.py). A cached copy therefore always belongs to the page that asks for it, also
+// when an older worker still runs after an update; a new version of a file is a new URL.
+const CACHE = "sharewerk-v4";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
-});
+self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -38,8 +27,15 @@ self.addEventListener("fetch", (event) => {
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(event.request);
       const network = fetch(event.request)
-        .then((response) => {
-          if (response.ok) cache.put(event.request, response.clone());
+        .then(async (response) => {
+          if (response.ok) {
+            await cache.put(event.request, response.clone());
+            // Other versions of the same file belong to pages that are gone.
+            for (const key of await cache.keys()) {
+              const other = new URL(key.url);
+              if (other.pathname === url.pathname && other.search !== url.search) await cache.delete(key);
+            }
+          }
           return response;
         })
         .catch(() => cached);
