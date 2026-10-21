@@ -42,10 +42,10 @@ jobs:
         run: ruff check
       - name: Tests
         run: python -m pytest -q
-      - name: JavaScript (syntax of the PWA scripts, app.js tests without dependencies)
+      - name: JavaScript (syntax of the PWA scripts, app.js and PWA update tests without npm packages)
         run: |
           for f in app/static/*.js; do node --check "$f"; done
-          node --test tests/js/app.test.mjs
+          node --test tests/js/app.test.mjs tests/js/pwa-update.test.mjs
       - name: Changelog section for the version in app/__init__.py
         run: |
           version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/__init__.py)

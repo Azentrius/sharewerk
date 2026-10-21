@@ -15,7 +15,7 @@ import shutil
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 
 TERMINAL = {"done", "error"}
 STORAGE_FAILED = "storage_failed"
+DELETE_FAILED = "delete_failed"  # a delete that stopped halfway; the job can be deleted again
 
 
 class StorageError(OSError):
@@ -263,10 +264,13 @@ class JobStore:
         # Only Instagram needs the cookies; a Facebook login error says nothing about them.
         if job.platform != "instagram":
             return
-        if job.status == "done":
-            state = "ok"
-        elif job.status == "error" and job.error_code == "auth_required":
+        # What the download said about the login, not whether a pack came out: a pack of the
+        # files that arrived before Instagram asked for a login (incomplete) still means expired.
+        login_failed = job.error_code if job.status == "error" else (job.result or {}).get("incomplete", "")
+        if login_failed == "auth_required":
             state = "expired"
+        elif job.status == "done":
+            state = "ok"
         else:
             return
         if job.updated >= self._cookies[1]:
@@ -289,13 +293,23 @@ class JobStore:
         """Delete a finished or failed job with all its files now, not only after
         SHAREWERK_RETENTION_HOURS. Returns "" when it is gone, else why not: "job_not_found" or
         "job_busy" (queued or running: the worker may be using its files). Raises StorageError
-        when the files cannot be removed; the job then stays listed."""
+        when the files cannot be removed.
+
+        The job is marked as failed with DELETE_FAILED before anything is removed. If removing
+        stops halfway, what is left is that failed job, also in job.json for a restart: nobody
+        gets it back as a result (the de-duplication skips failed jobs), its files are no longer
+        served, and it can be deleted again. If even the mark cannot be saved, nothing is removed."""
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
                 return "job_not_found"
             if job.status not in TERMINAL:
                 return "job_busy"
+            if job.error_code != DELETE_FAILED:
+                marked = replace(job, status="error", stage="done", error_code=DELETE_FAILED, error_detail="", result=None)
+                self._save(marked)  # StorageError: nothing removed, the job stays as it was
+                for name in ("status", "stage", "error_code", "error_detail", "result", "updated"):
+                    setattr(job, name, getattr(marked, name))
             try:
                 shutil.rmtree(self.workdir(job_id))
             except FileNotFoundError:

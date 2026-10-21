@@ -3,13 +3,16 @@
 
 import json
 import os
+import sys
 import time
 import uuid
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app import fetch as fetch_module
 from app.fetch import FetchError
 from app.jobs import Job
 from app.main import create_app
@@ -21,7 +24,8 @@ FACEBOOK = "https://www.facebook.com/reel/{}/"
 def runner(job, workdir, settings, set_stage):
     if "LOGIN" in job.url:
         raise FetchError("auth_required", "[instagram][error] 401 Unauthorized")
-    return {"files": {}, "packs": {}, "meta": {}, "counts": {}}
+    incomplete = "rate_limited" if "RATELIMITED" in job.url else ""
+    return {"files": {}, "packs": {}, "meta": {}, "counts": {}, "incomplete": incomplete}
 
 
 @pytest.fixture
@@ -107,3 +111,37 @@ def test_cookies_newer_than_the_last_verdict_are_unknown_after_a_restart(setting
     persisted(s, INSTAGRAM.format("LOGIN"), "error", "auth_required", age=7200)  # before the export
     with app_client(s) as client:
         assert health(client)[1]["cookies"] == "unknown"
+
+
+def test_a_pack_cut_short_by_a_rate_limit_still_means_the_cookies_work(settings, cookies):
+    with app_client(replace(settings, cookies_file=cookies)) as client:
+        job = run(client, INSTAGRAM.format("RATELIMITED"))
+        assert (job["status"], job["result"]["incomplete"]) == ("done", "rate_limited")
+        assert health(client) == (200, {"ok": True, "cookies": "ok"})
+
+
+FAKE = Path(__file__).with_name("fake_downloader.py")
+
+
+def test_a_partial_pack_after_a_login_error_reports_expired_cookies(settings, cookies, monkeypatch):
+    # Real download, pack and job: gallery-dl gets one real image and then needs a login,
+    # yt-dlp needs a login right away. The one image becomes a pack marked incomplete.
+    monkeypatch.setattr(fetch_module, "_tool", lambda name: [sys.executable, str(FAKE), name])
+    for key, value in {
+        "FAKE_GALLERY_DL_FILES": "1", "FAKE_GALLERY_DL_JPEG": "1", "FAKE_GALLERY_DL_EXIT": "16",
+        "FAKE_GALLERY_DL_STDERR": "[instagram][error] AuthRequired: login required\n",
+        "FAKE_YT_DLP_FILES": "0", "FAKE_YT_DLP_EXIT": "1",
+        "FAKE_YT_DLP_STDERR": "ERROR: [instagram] DPq1aBcXyZ_: login required\n",
+    }.items():
+        monkeypatch.setenv(key, value)
+    s = replace(settings, auth_mode="none", cookies_file=cookies)
+
+    with TestClient(create_app(s), base_url="https://testserver") as client:
+        job = run(client, INSTAGRAM.format("DPq1aBcXyZ_"))
+        assert (job["status"], job["result"]["incomplete"]) == ("done", "auth_required")
+        assert job["result"]["counts"]["pictures"] == 1  # the pack is there
+        assert client.get(f"/api/jobs/{job['id']}/files/01.jpg").status_code == 200
+        assert health(client) == (200, {"ok": True, "cookies": "expired"})
+
+    with TestClient(create_app(s), base_url="https://testserver") as client:  # after a restart
+        assert health(client) == (200, {"ok": True, "cookies": "expired"})

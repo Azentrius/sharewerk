@@ -107,6 +107,8 @@ const I18N = {
     "err.interrupted.body": "The server restarted in the meantime. Prepare the post again.",
     "err.internal.title": "An error occurred while preparing the post",
     "err.internal.body": "The details below help with debugging. docker compose logs sharewerk shows the logs.",
+    "err.delete_failed.title": "This result was only partly deleted",
+    "err.delete_failed.body": "Some of its files could not be removed. Delete it again in “Recently prepared”.",
     "err.storage_failed.title": "The server could not save the post",
     "err.storage_failed.body": "Its data volume is probably full or read-only. Free up space on the server, then prepare the post again.",
     "err.job_not_found.title": "This result has expired",
@@ -218,6 +220,8 @@ const I18N = {
     "err.interrupted.body": "Der Server wurde währenddessen neu gestartet. Bereite den Beitrag erneut auf.",
     "err.internal.title": "Bei der Aufbereitung ist ein Fehler aufgetreten",
     "err.internal.body": "Die Details unten helfen bei der Fehlersuche. Die Protokolle zeigt docker compose logs sharewerk.",
+    "err.delete_failed.title": "Dieses Ergebnis wurde nur teilweise gelöscht",
+    "err.delete_failed.body": "Einige Dateien ließen sich nicht entfernen. Lösche es in „Zuletzt aufbereitet“ erneut.",
     "err.storage_failed.title": "Der Server konnte den Beitrag nicht speichern",
     "err.storage_failed.body": "Vermutlich ist sein Datenspeicher voll oder schreibgeschützt. Gib auf dem Server Platz frei und bereite den Beitrag dann erneut auf.",
     "err.job_not_found.title": "Dieses Ergebnis ist abgelaufen",
@@ -475,18 +479,20 @@ async function confirmDelete() {
   if (!deleting) return;
   const { job } = deleting;
   closeDelete();
+  let failure = null;
   try {
     await api(`/api/jobs/${job.id}`, { method: "DELETE" });
   } catch (error) {
     if (error.code === "unauthorised") return;
-    const body = error.code === "job_busy" ? t("alert.deleteBusyBody") : t("alert.deleteFailedBody");
-    return showAlert("danger", t("alert.deleteFailedTitle"), body);
+    failure = error.code === "job_busy" ? t("alert.deleteBusyBody") : t("alert.deleteFailedBody");
   }
+  // Reload the list either way: a delete that stopped halfway turns the row into a failed one.
   let jobs = [];
   try {
     jobs = await api("/api/jobs");
   } catch { /* the list is optional */ }
   renderRecent(jobs);
+  if (failure) return showAlert("danger", t("alert.deleteFailedTitle"), failure);
   showAlert("success", t("alert.deletedTitle"), t("alert.deletedBody"), { autoHide: true });
 }
 
