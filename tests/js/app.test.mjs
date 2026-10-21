@@ -386,3 +386,15 @@ test("files of the job on screen are loaded once and shared from the cache", asy
     ["instagram-A-01.jpg", "A:01.jpg"],
   ]);
 });
+
+test("a Facebook post that needs a login gets its own message, Instagram keeps the cookie one", async () => {
+  for (const language of ["en", "de"]) {
+    const app = loadApp({}, { language });
+    await app.settle();
+    app.run('renderError({ error_code: "auth_required", platform: "facebook", url: "https://www.facebook.com/p/x/" })');
+    assert.equal(app.element("error-title").textContent, app.run('I18N[LANG]["err.auth_required_facebook.title"]'));
+    assert.equal(app.element("error-text").textContent, app.run('I18N[LANG]["err.auth_required_facebook.body"]'));
+    app.run('renderError({ error_code: "auth_required", platform: "instagram", url: "https://www.instagram.com/p/x/" })');
+    assert.equal(app.element("error-title").textContent, app.run('t("err.auth_required.title")'));
+  }
+});
