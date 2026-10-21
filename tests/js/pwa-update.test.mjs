@@ -90,7 +90,9 @@ class Node {
 function parse(html) {
   const root = new Node("#document");
   const stack = [root];
-  const tag = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/([a-z0-9-]+)\s*>|<([a-z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/gi;
+  // The attribute part is one run of plain characters or quoted strings; the three kinds start
+  // differently, so matching it never has to backtrack.
+  const tag = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/([a-z0-9-]+)\s*>|<([a-z0-9-]+)((?:[^>"']|"[^"]*"|'[^']*')*)>/gi;
   for (const m of html.matchAll(tag)) {
     if (m[1]) {
       const name = m[1].toUpperCase();
@@ -99,12 +101,13 @@ function parse(html) {
     }
     if (!m[2]) continue; // comment or doctype
     const attrs = {};
-    for (const a of (m[3] || "").matchAll(/([^\s=>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
+    const selfClosing = /\/\s*$/.test(m[3] || "");
+    for (const a of (m[3] || "").replace(/\/\s*$/, "").matchAll(/([^\s=>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
       attrs[a[1].toLowerCase()] = a[2] ?? a[3] ?? a[4] ?? "";
     }
     const node = new Node(m[2], attrs);
     stack.at(-1).append(node);
-    if (!VOID.has(m[2].toLowerCase()) && !m[4]) stack.push(node);
+    if (!VOID.has(m[2].toLowerCase()) && !selfClosing) stack.push(node);
   }
   return root;
 }
