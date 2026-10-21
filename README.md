@@ -194,6 +194,7 @@ Sharewerk is a tool for personal use: it saves you from taking screenshots of po
 |---|---|---|
 | Login required, or `"cookies":"expired"` in `/healthz` | Cookies missing or expired | Export new cookies; the state turns `unknown` as soon as the file is written, `ok` after the next Instagram download |
 | Download failed | Downloader outdated | Pull or rebuild the image |
+| Facebook asks for a login for this post | The post is visible to logged-in accounts only; the cookie file has no (valid) Facebook cookies | Export the cookies of a secondary Facebook account as well |
 | Too many requests | Rate limit on the account | Wait, then try again |
 | This pack is incomplete | The download stopped after some items, often at a rate limit; you get what arrived, and `post.txt` says so | Prepare the post again later for the rest |
 | Not in share menu | App not installed | Install from Chrome's menu |

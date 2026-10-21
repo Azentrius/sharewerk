@@ -89,7 +89,9 @@ const I18N = {
     "field.no_url": "Paste a link that starts with https://.",
     "field.host_not_allowed": "Paste a link to Instagram or Facebook.",
     "field.unsupported_link": "Paste the link to a single post, reel or story, not to a profile.",
-    "err.auth_required.title": "Instagram or Facebook asks for a login",
+    "err.auth_required_facebook.title": "Facebook asks for a login for this post",
+    "err.auth_required_facebook.body": "Many Facebook posts are visible to logged-in accounts only, and Sharewerk has no Facebook login, or an expired one. Export the cookies of a secondary Facebook account as well (README, section “Cookies”).",
+    "err.auth_required.title": "Instagram asks for a login",
     "err.auth_required.body": "The cookies of a logged-in account are missing on the server or have expired. Export them again to secrets/cookies.txt (README, section “Cookies”).",
     "err.rate_limited.title": "Too many requests to Instagram or Facebook",
     "err.rate_limited.body": "The account is being throttled right now. Try again in a few minutes.",
@@ -202,7 +204,9 @@ const I18N = {
     "field.no_url": "Füge einen Link ein, der mit https:// beginnt.",
     "field.host_not_allowed": "Füge einen Link zu Instagram oder Facebook ein.",
     "field.unsupported_link": "Füge den Link zu einem einzelnen Beitrag, Reel oder einer Story ein, nicht zu einem Profil.",
-    "err.auth_required.title": "Instagram oder Facebook verlangt eine Anmeldung",
+    "err.auth_required_facebook.title": "Facebook verlangt für diesen Beitrag eine Anmeldung",
+    "err.auth_required_facebook.body": "Viele Facebook-Beiträge sehen nur angemeldete Konten, und Sharewerk hat keine oder eine abgelaufene Facebook-Anmeldung. Exportiere zusätzlich die Cookies eines Facebook-Zweitkontos (README, Abschnitt „Cookies“).",
+    "err.auth_required.title": "Instagram verlangt eine Anmeldung",
     "err.auth_required.body": "Auf dem Server fehlen die Cookies eines angemeldeten Kontos, oder sie sind abgelaufen. Exportiere sie neu nach secrets/cookies.txt (README, Abschnitt „Cookies“).",
     "err.rate_limited.title": "Zu viele Anfragen an Instagram oder Facebook",
     "err.rate_limited.body": "Das Konto wird gerade gedrosselt. Versuch es in ein paar Minuten erneut.",
@@ -772,6 +776,8 @@ function showDownloads(job, names) {
 function renderError(job, request = { url: job.url }) {
   show("error");
   let code = job.error_code || "internal";
+  // The cookie file is usually Instagram's only: a Facebook login error means something else.
+  if (code === "auth_required" && job.platform === "facebook") code = "auth_required_facebook";
   if (t(`err.${code}.title`) === `err.${code}.title`) code = "internal";
   $("error-title").textContent = t(`err.${code}.title`);
   $("error-text").textContent = t(`err.${code}.body`, { h: config.retention_hours });
