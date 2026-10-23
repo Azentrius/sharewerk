@@ -186,7 +186,7 @@ All settings are environment variables in `.env`. `.env.example` documents each 
 
 ## Legal
 
-Sharewerk is a tool for personal use: it saves you from taking screenshots of posts you can already see. Automated access to Instagram and Facebook is against Meta's terms of use, and the content of a post belongs to its author. You are responsible for how you use it. This project is not affiliated with Meta.
+Sharewerk is a tool for personal use: it saves you from taking screenshots of posts you can already see. Automated access to Instagram and Facebook is against Meta's terms of use, and the content of a post belongs to its author. You are responsible for how you use it. This project is not affiliated with or endorsed by Meta Platforms. Instagram, Facebook and the other app names in this README are trademarks of their respective owners.
 
 ## Troubleshooting
 
