@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 from .config import Settings
 from .cookies import for_download
@@ -171,6 +173,28 @@ def _first(data: dict, *keys: str) -> str:
 
 # --------------------------------------------------------------------- gallery-dl
 
+FB_POST_PATHS = {"/story.php", "/permalink.php"}
+FB_STORY_ID = re.compile(r"[0-9]+|pfbid[0-9A-Za-z]+")
+FB_OWNER_ID = re.compile(r"[0-9]+")
+
+
+def gallery_dl_url(target: Target) -> str:
+    """The link gallery-dl gets. A Facebook post resolves to story.php?story_fbid=...&id=...,
+    which gallery-dl reads as a profile named "story.php" and fails on; a permalink.php link it
+    takes for the page's whole photo stream. As <id>/posts/<story_fbid> it opens the post and
+    gets the post's own pictures. yt-dlp keeps the original link, which works for videos."""
+    if target.platform != "facebook":
+        return target.url
+    parts = urlsplit(target.url)
+    if parts.path not in FB_POST_PATHS:
+        return target.url
+    query = dict(parse_qsl(parts.query))
+    story, owner = query.get("story_fbid", ""), query.get("id", "")
+    if FB_STORY_ID.fullmatch(story) and FB_OWNER_ID.fullmatch(owner):
+        return f"https://www.facebook.com/{owner}/posts/{story}"
+    return target.url
+
+
 def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Settings) -> FetchResult:
     # The tool runs inside raw, so every path it gets must be absolute.
     raw = raw.resolve()
@@ -186,7 +210,7 @@ def run_gallery_dl(target: Target, raw: Path, cookies: Path | None, settings: Se
         cmd += ["--config", str(config)]
     if cookies:
         cmd += ["--cookies", str(cookies.resolve())]
-    cmd.append(target.url)
+    cmd.append(gallery_dl_url(target))
 
     proc = _run(cmd, cwd=raw)
     files = _media_files(raw)

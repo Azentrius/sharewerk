@@ -154,6 +154,55 @@ def test_complete_first_tool_needs_no_fallback(tools, tmp_path, with_cookies):
     assert [c["tool"] for c in tools.calls()] == ["gallery-dl"]
 
 
+# ------------------------------------------------------------- Facebook photo posts
+
+# A shared facebook.com/share/p/... link, resolved and normalised (app/urls.py).
+FACEBOOK_POST = Target(
+    "https://www.facebook.com/story.php?story_fbid=1128847296531599&id=100082190168714"
+    "&post_id=100082190168714_1128847296531599",
+    "facebook", "post", "1128847296531599",
+)
+
+
+def test_a_facebook_photo_post_reaches_gallery_dl_as_a_post_link(tools, tmp_path, settings):
+    # yt-dlp finds no video in a post with a picture. gallery-dl reads story.php as a profile
+    # named "story.php" and fails; as <id>/posts/<story_fbid> it gets the post's own pictures.
+    tools.set("yt-dlp", exit=1, stderr="ERROR: [facebook] 1128847296531599: No video formats found!\n")
+    tools.set("gallery-dl", files=1)
+    result = fetch(FACEBOOK_POST, tmp_path / "job", settings)
+    assert (result.tool, len(result.items)) == ("gallery-dl", 1)
+    calls = tools.calls()
+    assert [c["tool"] for c in calls] == ["yt-dlp", "gallery-dl"]
+    assert calls[0]["args"][-1] == FACEBOOK_POST.url  # yt-dlp keeps the link that works for videos
+    assert calls[1]["args"][-1] == "https://www.facebook.com/100082190168714/posts/1128847296531599"
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://www.facebook.com/story.php?story_fbid=1128847296531599&id=100082190168714",
+     "https://www.facebook.com/100082190168714/posts/1128847296531599"),
+    # permalink.php would give gallery-dl the page's whole photo stream instead of the post.
+    ("https://www.facebook.com/permalink.php?story_fbid=1705099180979984&id=100044397550724",
+     "https://www.facebook.com/100044397550724/posts/1705099180979984"),
+    ("https://www.facebook.com/story.php?story_fbid=pfbid02AbCdEf123&id=100082190168714",
+     "https://www.facebook.com/100082190168714/posts/pfbid02AbCdEf123"),
+    ("https://www.facebook.com/story.php?id=100082190168714&story_fbid=1128847296531599&post_id=x",
+     "https://www.facebook.com/100082190168714/posts/1128847296531599"),
+    # Anything else stays as it is.
+    ("https://www.facebook.com/story.php?story_fbid=1128847296531599", None),
+    ("https://www.facebook.com/story.php?story_fbid=1128847296531599&id=../../evil", None),
+    ("https://www.facebook.com/story.php?story_fbid=11%2F28&id=100082190168714", None),
+    ("https://www.facebook.com/reel/954162721072206/", None),
+    ("https://www.facebook.com/photo/?fbid=1128847296531599&set=a.1", None),
+])
+def test_the_link_gallery_dl_gets_for_a_facebook_post(url, expected):
+    target = Target(url, "facebook", "post", "key")
+    assert fetch_module.gallery_dl_url(target) == (expected or url)
+
+
+def test_instagram_links_reach_gallery_dl_unchanged():
+    assert fetch_module.gallery_dl_url(INSTAGRAM) == INSTAGRAM.url
+
+
 # ------------------------------------------------------------------------ paths
 
 @pytest.mark.parametrize("target,tool", [(INSTAGRAM, "gallery-dl"), (FACEBOOK, "yt-dlp")])
