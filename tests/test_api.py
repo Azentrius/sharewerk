@@ -11,6 +11,10 @@ from app.main import create_app, safe_next
 
 from .conftest import TOKEN, make_image
 
+
+# The cookie part of /healthz without any cookies.
+NO_COOKIES = {"cookies": "missing", "cookie_states": {"instagram": "missing", "facebook": "missing"}}
+
 POST = "https://www.instagram.com/p/DPq1aBcXyZ_/?igsh=abc"
 
 
@@ -72,7 +76,7 @@ def test_public_assets_need_no_login(client):
     assert client.get("/manifest.webmanifest").json()["share_target"]["method"] == "GET"
     assert client.get("/sw.js").status_code == 200
     assert client.get("/static/app.js").status_code == 200
-    assert client.get("/healthz").json() == {"ok": True, "cookies": "missing"}
+    assert client.get("/healthz").json() == {"ok": True, **NO_COOKIES}
 
 
 def test_login_flow_sets_cookie(client):

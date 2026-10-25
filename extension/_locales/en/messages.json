@@ -1,0 +1,10 @@
+{
+  "name": {
+    "message": "Sharewerk",
+    "description": "Name of the extension."
+  },
+  "description": {
+    "message": "Sends the cookies of your Instagram and Facebook login to your own Sharewerk server.",
+    "description": "Description in the Chrome extension list, at most 132 characters."
+  }
+}

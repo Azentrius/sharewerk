@@ -8,6 +8,9 @@ cookies*.txt
 # Runtime data
 data/
 
+# Built browser extension (tools/build-extension.py)
+dist/
+
 # Python
 __pycache__/
 *.py[cod]

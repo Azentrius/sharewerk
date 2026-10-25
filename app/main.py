@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -19,6 +20,10 @@ from pydantic import BaseModel
 from . import __version__
 from .assets import page
 from .config import Settings, load_settings
+from .cookies import PLATFORMS, CookieError, netscape
+from .cookies import remove as remove_cookies
+from .cookies import save as save_cookies
+from .cookies import source as cookie_source
 from .jobs import STORAGE_FAILED, JobStore, Runner, StorageError, default_runner
 from .urls import UrlError, target_from_shared
 
@@ -46,6 +51,8 @@ LOGIN_TEXT = {
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "sharewerk_session"
+CLIENT_HEADER = "x-sharewerk-client"
+MAX_COOKIE_UPLOAD = 512 * 1024
 PUBLIC_PATHS = {"/healthz", "/login", "/manifest.webmanifest", "/sw.js", "/favicon.ico"}
 CSP = (
     "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; "
@@ -84,7 +91,7 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             "Sharewerk ready (auth=%s, transcription=%s, cookies=%s)",
             settings.auth_mode,
             settings.whisper_model if settings.transcription_enabled else "off",
-            "yes" if settings.cookies_file.is_file() else "no",
+            ",".join(p for p in PLATFORMS if cookie_source(settings, p)) or "none",
         )
         yield
         store.stop()
@@ -149,12 +156,15 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
     def healthz() -> Response:
         # 503 when jobs cannot be processed: the worker stopped, or job states cannot be saved.
         # The cookie state never fails the check (Facebook works without cookies); a monitor
-        # can watch for "cookies":"expired" on its own.
+        # can watch for "cookies":"expired" on its own. "cookies" is Instagram's state, as before
+        # there were cookies per platform; "cookie_states" has every platform.
         problem = store.problem()
-        cookies = store.cookie_state()
+        body: dict = {"ok": not problem}
         if problem:
-            return JSONResponse({"ok": False, "problem": problem, "cookies": cookies}, status_code=503)
-        return JSONResponse({"ok": True, "cookies": cookies})
+            body["problem"] = problem
+        body["cookies"] = store.cookie_state("instagram")
+        body["cookie_states"] = {p: store.cookie_state(p) for p in PLATFORMS}
+        return JSONResponse(body, status_code=503 if problem else 200)
 
     @app.get("/login", include_in_schema=False)
     def login_page(request: Request, error: str = "") -> Response:
@@ -205,7 +215,7 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             "version": __version__,
             "auth_mode": settings.auth_mode,
             "transcription": settings.transcription_enabled,
-            "cookies": settings.cookies_file.is_file(),
+            "cookies": any(cookie_source(settings, p) for p in PLATFORMS),
             "retention_hours": settings.retention_hours,
             "max_share_files": 10,
         }
@@ -258,6 +268,73 @@ def create_app(settings: Settings | None = None, runner: Runner | None = None) -
             path, media_type=meta["type"], filename=meta["name"], content_disposition_type="inline",
             headers={"Cache-Control": "private, max-age=86400"},
         )
+
+    # ---------------------------------------------------- cookies (browser extension)
+    # Only the extension sends cookies. Its requests carry CLIENT_HEADER: a web page cannot add a
+    # custom header to a request to another site without a CORS preflight, which this app never
+    # allows, so no other site can plant cookies here through a logged-in browser.
+    def cookie_view(platform: str) -> dict:
+        found = cookie_source(settings, platform)
+        updated = None
+        if found:
+            try:
+                updated = found[0].stat().st_mtime
+            except OSError:
+                found = None
+        return {
+            "state": store.cookie_state(platform),
+            "source": found[1] if found else "",
+            "updated": updated,
+        }
+
+    def check_cookie_request(request: Request, platform: str) -> None:
+        if request.headers.get(CLIENT_HEADER, "") != "extension":
+            raise HTTPException(status_code=403, detail={"code": "client_header_missing"})
+        if platform not in PLATFORMS:
+            raise HTTPException(status_code=404, detail={"code": "platform_unknown"})
+
+    @app.get("/api/cookies")
+    def list_cookies() -> dict:
+        return {"platforms": {p: cookie_view(p) for p in PLATFORMS}}
+
+    @app.put("/api/cookies/{platform}")
+    async def put_cookies(platform: str, request: Request) -> dict:
+        check_cookie_request(request, platform)
+        too_large = HTTPException(status_code=413, detail={"code": "cookies_too_large"})
+        length = request.headers.get("content-length", "0")
+        if not length.isdigit() or int(length) > MAX_COOKIE_UPLOAD:
+            raise too_large
+        raw = await request.body()
+        if len(raw) > MAX_COOKIE_UPLOAD:  # sent without a (true) Content-Length
+            raise too_large
+        try:
+            data = json.loads(raw)
+        except (ValueError, RecursionError):  # RecursionError: nested a few thousand levels deep
+            data = None
+        try:
+            text = netscape(platform, data.get("cookies") if isinstance(data, dict) else None)
+        except CookieError as exc:  # the message names domains or cookie names, never values
+            raise HTTPException(status_code=422, detail={"code": exc.code, "message": str(exc)}) from exc
+        try:
+            save_cookies(settings, platform, text)
+        except OSError as exc:
+            log.error("cannot save the cookies of %s: %s", platform, exc)
+            raise HTTPException(status_code=503, detail={"code": STORAGE_FAILED}) from exc
+        log.info("cookies of %s received from the browser extension", platform)
+        return {"platform": platform, **cookie_view(platform)}
+
+    @app.delete("/api/cookies/{platform}")
+    def delete_cookies(platform: str, request: Request) -> dict:
+        check_cookie_request(request, platform)
+        try:
+            removed = remove_cookies(settings, platform)
+        except OSError as exc:
+            log.error("cannot delete the cookies of %s: %s", platform, exc)
+            raise HTTPException(status_code=503, detail={"code": STORAGE_FAILED}) from exc
+        if not removed:
+            raise HTTPException(status_code=404, detail={"code": "cookies_not_found"})
+        log.info("cookies of %s deleted by the browser extension", platform)
+        return {"platform": platform, **cookie_view(platform)}
 
     def job_view(job) -> dict:
         data = job.public()

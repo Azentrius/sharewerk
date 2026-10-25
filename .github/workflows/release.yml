@@ -1,7 +1,7 @@
 # Makes a release on request: Actions › release › Run workflow (on main).
-# Checks the version, runs all tests, builds the source archive and the image
-# ghcr.io/azentrius/sharewerk:VERSION with signed build provenance, and creates the tag vVERSION
-# with a GitHub release (archive, SHA256SUMS, notes from CHANGELOG.md).
+# Checks the version, runs all tests, builds the source archive, the browser extension and the
+# image ghcr.io/azentrius/sharewerk:VERSION with signed build provenance, and creates the tag
+# vVERSION with a GitHub release (archive, extension, SHA256SUMS, notes from CHANGELOG.md).
 name: release
 
 on:
@@ -84,6 +84,11 @@ jobs:
         run: ruff check
       - name: Tests
         run: python -m pytest -q
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: JavaScript tests (PWA and browser extension)
+        run: node --test tests/js/app.test.mjs tests/js/pwa-update.test.mjs tests/js/extension.test.mjs
 
       - name: Source archive
         env:
@@ -91,6 +96,14 @@ jobs:
         run: |
           git archive --format=tar.gz --prefix="sharewerk-$VERSION/" -o "sharewerk-$VERSION.tar.gz" "$GITHUB_SHA"
           sha256sum "sharewerk-$VERSION.tar.gz" > SHA256SUMS
+
+      - name: Browser extension
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python tools/build-extension.py dist
+          cp "dist/sharewerk-extension-$VERSION.zip" .
+          sha256sum "sharewerk-extension-$VERSION.zip" >> SHA256SUMS
 
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -123,6 +136,10 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: sharewerk-${{ steps.version.outputs.version }}.tar.gz
+      - name: Build provenance for the browser extension
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: sharewerk-extension-${{ steps.version.outputs.version }}.zip
       - name: Build provenance for the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -146,12 +163,15 @@ jobs:
             echo "gh attestation verify oci://$IMAGE:$VERSION --repo $GITHUB_REPOSITORY"
             echo '```'
             echo
-            echo "Source archive: download it and \`SHA256SUMS\`, then check that the download is complete and that this repository's release workflow built it:"
+            echo "Source archive and browser extension: download them and \`SHA256SUMS\`, then check that the downloads are complete and that this repository's release workflow built them:"
             echo
             echo '```sh'
             echo "sha256sum -c SHA256SUMS"
             echo "gh attestation verify sharewerk-$VERSION.tar.gz --repo $GITHUB_REPOSITORY"
+            echo "gh attestation verify sharewerk-extension-$VERSION.zip --repo $GITHUB_REPOSITORY"
             echo '```'
+            echo
+            echo "Browser extension (Chrome): unpack \`sharewerk-extension-$VERSION.zip\`, then in \`chrome://extensions\` switch on developer mode and use \"Load unpacked\". See the README, section \"Browser extension\"."
           } >> notes.md
 
       - name: Create the release
@@ -164,4 +184,4 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then
             set -- "$@" --prerelease
           fi
-          gh release create "v$VERSION" "sharewerk-$VERSION.tar.gz" SHA256SUMS "$@"
+          gh release create "v$VERSION" "sharewerk-$VERSION.tar.gz" "sharewerk-extension-$VERSION.zip" SHA256SUMS "$@"

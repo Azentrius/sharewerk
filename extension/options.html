@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Sharewerk browser extension · SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharewerk</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="azentrius/tokens.css">
+  <link rel="stylesheet" href="azentrius/bundle.css">
+  <link rel="stylesheet" href="extension.css">
+  <script src="icons.js" defer></script>
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+<div class="az-page sx-options">
+  <header class="az-page-header">
+    <div>
+      <h1 class="az-page-title az-page-title--dot">Sharewerk</h1>
+      <p class="az-page-desc" data-i18n="options.desc"></p>
+    </div>
+  </header>
+
+  <div id="alert" class="az-alert" hidden>
+    <span class="az-alert__icon"></span>
+    <p class="az-alert__title"></p>
+    <p class="az-alert__body"></p>
+  </div>
+
+  <section class="az-card" aria-labelledby="server-title">
+    <div class="az-card__header">
+      <div>
+        <h2 class="az-card__title" id="server-title" data-i18n="server.title"></h2>
+        <p class="az-card__desc" data-i18n="server.desc"></p>
+      </div>
+    </div>
+    <div class="az-card__body">
+      <form id="server-form" class="sx-form" novalidate>
+        <div class="az-field">
+          <label class="az-field__label" for="server-input" data-i18n="server.label"></label>
+          <input class="az-input az-mono" id="server-input" type="url" inputmode="url"
+                 autocomplete="off" spellcheck="false" aria-describedby="server-help server-error">
+          <p class="az-field__help" id="server-help" data-i18n="server.help"></p>
+          <p class="az-field__error" id="server-error" hidden><span data-icon="exclamation-circle"></span><span id="server-error-text"></span></p>
+        </div>
+        <button class="az-btn az-btn--primary" type="submit" data-i18n="server.save"></button>
+      </form>
+    </div>
+  </section>
+
+  <section class="az-card" id="sent-card" aria-labelledby="sent-title" hidden>
+    <div class="az-card__header">
+      <div>
+        <h2 class="az-card__title" id="sent-title" data-i18n="sent.title"></h2>
+        <p class="az-card__desc" data-i18n="sent.desc"></p>
+      </div>
+    </div>
+    <div class="az-card__body--flush az-table-wrap">
+      <table class="az-table az-table--stack">
+        <thead>
+          <tr>
+            <th data-i18n="sent.platform"></th>
+            <th data-i18n="sent.state"></th>
+            <th><span class="az-sr" data-i18n="sent.actions"></span></th>
+          </tr>
+        </thead>
+        <tbody id="sent"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="az-backdrop" id="delete-dialog" hidden>
+    <div class="az-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+      <div class="az-modal__header">
+        <h2 class="az-modal__title" id="delete-title"></h2>
+        <button class="az-btn az-btn--plain az-btn--sm" id="delete-close" type="button"><span data-icon="times"></span></button>
+      </div>
+      <div class="az-modal__body"><p id="delete-text"></p></div>
+      <div class="az-modal__footer">
+        <button class="az-btn az-btn--danger" id="delete-confirm" type="button" data-i18n="delete.confirm"></button>
+        <button class="az-btn az-btn--link" id="delete-cancel" type="button" data-i18n="delete.cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="az-signature">
+    <a class="az-signature__mark" href="https://azentrius.de">Azentrius</a>
+    <span class="az-signature__meta">
+      <span>Sharewerk</span>
+      <span id="sig-version"></span>
+      <a href="https://github.com/Azentrius/sharewerk" data-i18n="footer.source"></a>
+    </span>
+  </footer>
+</div>
+</body>
+</html>

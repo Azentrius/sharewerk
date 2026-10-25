@@ -13,7 +13,8 @@ Rules followed (design system, section "Android", "App-Symbol"):
   monochrome layer and in the notification icon
 - dot radius 4.120 dp, as in Lautwerk and Stellwerk
 
-Usage: python scripts/app-icon-sharewerk.py [OUTPUT_DIR]   (default: app/static/icons)
+Usage: python scripts/app-icon-sharewerk.py [OUTPUT_DIR [EXTENSION_DIR]]
+       (defaults: app/static/icons and extension/icons, the browser extension's icons)
 Needs: pip install shapely pillow
 """
 
@@ -123,7 +124,7 @@ def raster(sign: MultiPolygon, size: int, view: tuple[float, float, float], *, b
     return img.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def main(out: Path) -> None:
+def main(out: Path, extension_out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     sign = build_sign()
     info = check(sign)
@@ -147,6 +148,18 @@ def main(out: Path) -> None:
     raster(sign, 512, (0, 0, 108), background=BRAND_INK).save(out / "maskable-512.png")
     print(f"written to {out}")
 
+    # Browser extension (toolbar, menus, extension list): like the favicon, ink with rounded corners.
+    extension_out.mkdir(parents=True, exist_ok=True)
+    for size in (16, 32, 48, 128):
+        raster(sign, size, (18, 18, 72), background=BRAND_INK, radius_ratio=15.75 / 72).save(
+            extension_out / f"icon-{size}.png"
+        )
+    print(f"written to {extension_out}")
+
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent / "app" / "static" / "icons")
+    root = Path(__file__).resolve().parent.parent
+    main(
+        Path(sys.argv[1]) if len(sys.argv) > 1 else root / "app" / "static" / "icons",
+        Path(sys.argv[2]) if len(sys.argv) > 2 else root / "extension" / "icons",
+    )
