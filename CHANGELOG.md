@@ -41,6 +41,10 @@ cookie file keeps working.
   URL, so page and scripts always fit together.
 - **Fix: a partial pack after a login error reported the cookies as fine.** The cookie state now
   comes from the download, not from the pack.
+- **Fix: Facebook posts with pictures failed.** A shared post resolves to `story.php`, which
+  gallery-dl took for a profile and failed on, after yt-dlp found no video in it. gallery-dl now gets
+  such a post (and a `permalink.php` link) as `<id>/posts/<story_fbid>` and downloads the post's own
+  pictures; yt-dlp keeps the original link for videos.
 - **Hardening:** a host that only ends with `instagram.com` or `facebook.com`, such as
   `evilinstagram.com`, no longer counts as Instagram or Facebook. The host allowlist already refused
   such links.
