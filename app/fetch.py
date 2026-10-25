@@ -4,8 +4,11 @@
 Both tools are called as subprocesses with argument lists (never a shell), so
 nothing from the shared URL can be interpreted as a command.
 
-Instagram: gallery-dl first (it handles image carousels), yt-dlp as fallback.
-Facebook:  yt-dlp first (videos and reels), gallery-dl as fallback (photos).
+Instagram:                  gallery-dl first (it handles image carousels), yt-dlp as fallback.
+Facebook posts:             gallery-dl first (the post's own pictures), yt-dlp as fallback (a post
+                            with a video only). yt-dlp first took a short video from the page of a
+                            post with a picture, and the pack had that video instead of the picture.
+Facebook reels and videos:  yt-dlp first, gallery-dl as fallback.
 """
 
 from __future__ import annotations
@@ -329,11 +332,8 @@ def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
 
     cookies = for_download(settings, target.platform, workdir / "cookies.txt")
 
-    order = (
-        [run_gallery_dl, run_yt_dlp]
-        if target.platform == "instagram"
-        else [run_yt_dlp, run_gallery_dl]
-    )
+    pictures_first = target.platform == "instagram" or (target.platform == "facebook" and target.kind == "post")
+    order = [run_gallery_dl, run_yt_dlp] if pictures_first else [run_yt_dlp, run_gallery_dl]
     errors: list[FetchError] = []
     best: FetchError | None = None  # the failure with the most files; they wait in `partial`
     try:
