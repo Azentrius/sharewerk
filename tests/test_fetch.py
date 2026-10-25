@@ -17,6 +17,12 @@ FAKE = Path(__file__).with_name("fake_downloader.py")
 INSTAGRAM = Target("https://www.instagram.com/p/DPq1aBcXyZ_/", "instagram", "post", "DPq1aBcXyZ_")
 FACEBOOK = Target("https://www.facebook.com/reel/954162721072206/", "facebook", "reel", "954162721072206")
 RUNNERS = [(run_gallery_dl, "gallery-dl"), (run_yt_dlp, "yt-dlp")]
+# A cookie file put in place by hand, with (fake) cookies of both platforms.
+COOKIES = (
+    "# Netscape HTTP Cookie File\n"
+    ".instagram.com\tTRUE\t/\tTRUE\t0\tsessionid\ttest\n"
+    ".facebook.com\tTRUE\t/\tTRUE\t0\tc_user\ttest\n"
+)
 
 
 class FakeTools:
@@ -56,7 +62,7 @@ def raw(tmp_path) -> Path:
 @pytest.fixture
 def with_cookies(settings, tmp_path):
     cookies = tmp_path / "cookies.txt"
-    cookies.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    cookies.write_text(COOKIES, encoding="utf-8")
     return replace(settings, cookies_file=cookies)
 
 
@@ -157,7 +163,7 @@ def test_relative_paths_reach_the_tool_resolved(target, tool, tools, tmp_path, s
     # working directory, so every path has to be resolved before that.
     monkeypatch.chdir(tmp_path)
     (tmp_path / "secrets").mkdir()
-    (tmp_path / "secrets" / "cookies.txt").write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    (tmp_path / "secrets" / "cookies.txt").write_text(COOKIES, encoding="utf-8")
     (tmp_path / "secrets" / "gallery-dl.conf").write_text("{}", encoding="utf-8")
     relative = replace(
         settings,

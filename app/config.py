@@ -83,6 +83,11 @@ class Settings:
         return self.data_dir / "models"
 
     @property
+    def cookies_dir(self) -> Path:
+        """Cookies sent by the browser extension, one file per platform (app/cookies.py)."""
+        return self.data_dir / "cookies"
+
+    @property
     def transcription_enabled(self) -> bool:
         return self.whisper_model.lower() not in {"", "off", "none", "false", "0"}
 

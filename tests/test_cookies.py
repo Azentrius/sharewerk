@@ -19,6 +19,8 @@ from app.main import create_app
 
 INSTAGRAM = "https://www.instagram.com/p/{}/"
 FACEBOOK = "https://www.facebook.com/reel/{}/"
+# A cookie file put in place by hand, with (fake) Instagram cookies only.
+INSTAGRAM_COOKIES = "# Netscape HTTP Cookie File\n.instagram.com\tTRUE\t/\tTRUE\t0\tsessionid\ttest\n"
 
 
 def runner(job, workdir, settings, set_stage):
@@ -31,7 +33,7 @@ def runner(job, workdir, settings, set_stage):
 @pytest.fixture
 def cookies(tmp_path):
     path = tmp_path / "cookies.txt"
-    path.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    path.write_text(INSTAGRAM_COOKIES, encoding="utf-8")
     old = time.time() - 3600  # exported an hour ago
     os.utime(path, (old, old))
     return path
@@ -49,8 +51,12 @@ def run(client, url: str) -> dict:
 
 
 def health(client) -> tuple[int, dict]:
+    """Status and body of /healthz; "cookies" is the Instagram entry of "cookie_states"."""
     r = client.get("/healthz")
-    return r.status_code, r.json()
+    body = r.json()
+    states = body.pop("cookie_states")
+    assert states["instagram"] == body["cookies"]
+    return r.status_code, body
 
 
 def app_client(settings):

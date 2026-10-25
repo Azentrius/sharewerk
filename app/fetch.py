@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import Settings
+from .cookies import for_download
 from .urls import Target
 
 log = logging.getLogger(__name__)
@@ -291,8 +292,8 @@ def _set_aside(result: FetchResult, directory: Path) -> None:
 
 
 def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
-    """Download into workdir/raw. Cookies are copied per job and deleted after,
-    because both tools write updated cookies back into the file they were given.
+    """Download into workdir/raw. The tools get the cookies of the post's platform only, copied
+    per job and deleted after, because both write updated cookies back into the file they were given.
 
     When both tools stop with an error after some files, the bigger of these partial downloads
     is the result, marked `incomplete` with the error's code: a part of a carousel is still
@@ -302,11 +303,7 @@ def fetch(target: Target, workdir: Path, settings: Settings) -> FetchResult:
     raw.mkdir(parents=True, exist_ok=True)
     partial = workdir / "partial"
 
-    cookies: Path | None = None
-    if settings.cookies_file.is_file():
-        cookies = workdir / "cookies.txt"
-        shutil.copyfile(settings.cookies_file, cookies)
-        cookies.chmod(0o600)
+    cookies = for_download(settings, target.platform, workdir / "cookies.txt")
 
     order = (
         [run_gallery_dl, run_yt_dlp]

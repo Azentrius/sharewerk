@@ -1,0 +1,24 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Sharewerk browser extension: only layout that the Azentrius Design System leaves open, as in
+   app/static/app.css. Colours, type, spacing, radii and components come from azentrius/tokens.css
+   and azentrius/bundle.css, which the build copies unchanged from app/static/azentrius/. */
+
+[hidden] { display: none !important; }
+
+/* Chrome sizes the menu to its content, up to 800 x 600 pixels. */
+.sx-popup { inline-size: 380px; }
+
+.sx-options { max-inline-size: 720px; margin-inline: auto; }
+
+.sx-stack { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.sx-form { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+.sx-form .az-field { align-self: stretch; }
+
+.az-card__body p,
+.sx-stack p { margin: 0; }
+
+.sx-footer { display: flex; justify-content: flex-end; }
+
+/* Link actions in an alert start flush with its text, as in the design system's Alert preview. */
+.az-alert__actions .az-btn--link { padding-inline: 0; }

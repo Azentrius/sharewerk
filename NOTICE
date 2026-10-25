@@ -2,11 +2,14 @@ Sharewerk
 Copyright 2026 Azentrius
 Licensed under the Apache License, Version 2.0. See LICENSE.
 
-The Sharewerk sign (app/static/icons/, built by scripts/app-icon-sharewerk.py), two stacked
-cards with an arrow and the dot of the Azentrius word mark, is a mark of Azentrius, as are the
-names Azentrius and Sharewerk. They are not licensed under the Apache License; all rights reserved.
+The Sharewerk sign (app/static/icons/ and extension/icons/, built by scripts/app-icon-sharewerk.py),
+two stacked cards with an arrow and the dot of the Azentrius word mark, is a mark of Azentrius, as
+are the names Azentrius and Sharewerk. They are not licensed under the Apache License; all rights
+reserved.
 
-This project includes third-party material under its own license (texts in LICENSES/):
+This project includes third-party material under its own license (texts in LICENSES/). The browser
+extension (extension/, built by tools/build-extension.py) ships the same files, copied unchanged
+from app/static/ to azentrius/, icons.js and theme.js, together with this NOTICE and LICENSES/:
 
 Azentrius Design System (app/static/azentrius/tokens.css and bundle.css, copied unchanged)
   Apache License 2.0, see LICENSES/Apache-2.0-Azentrius-Design-System.txt

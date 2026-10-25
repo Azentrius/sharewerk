@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Callable
 
 from .config import Settings
+from .cookies import PLATFORMS
+from .cookies import source as cookie_source
 from .fetch import FetchError, FetchResult, fetch
 from .process import build_pack, mime_for, originals, share_batches
 from .urls import Target
@@ -161,8 +163,8 @@ class JobStore:
         self._threads: list[threading.Thread] = []
         self._worker: threading.Thread | None = None
         self._storage_failures = 0  # jobs in a row whose state could not be saved
-        # What the last Instagram download said about the cookies ("ok" or "expired"), and when.
-        self._cookies: tuple[str, float] = ("unknown", 0.0)
+        # Per platform: what its last download said about the cookies ("ok" or "expired"), and when.
+        self._cookies: dict[str, tuple[str, float]] = {}
         self._last_instagram: float | None = None  # time.monotonic() of the last Instagram download
 
     # ---------------------------------------------------------------- lifecycle
@@ -247,25 +249,29 @@ class JobStore:
     def workdir(self, job_id: str) -> Path:
         return self.settings.jobs_dir / job_id
 
-    def cookie_state(self) -> str:
-        """The cookies as the last Instagram download saw them, for the health check: "ok",
-        "expired" (it asked for a login), "missing" (no cookie file) or "unknown" (no Instagram
-        download since the cookie file was last written)."""
+    def cookie_state(self, platform: str = "instagram") -> str:
+        """The cookies of `platform` as its last download saw them, for the health check: "ok",
+        "expired" (it asked for a login), "missing" (no cookies of that platform) or "unknown" (no
+        download of that platform since its cookies were last written)."""
+        found = cookie_source(self.settings, platform)
         try:
-            written = self.settings.cookies_file.stat().st_mtime
+            written = found[0].stat().st_mtime if found else None
         except OSError:
+            written = None
+        if written is None:
             return "missing"
-        state, when = self._cookies
+        state, when = self._cookies.get(platform, ("unknown", 0.0))
         if state != "unknown" and written > when:
             return "unknown"  # new cookies, not tried yet
         return state
 
     def _note_cookies(self, job: Job) -> None:
-        # Only Instagram needs the cookies; a Facebook login error says nothing about them.
-        if job.platform != "instagram":
+        # Each platform's downloads judge its own cookies only: a Facebook login error says
+        # nothing about the Instagram cookies.
+        if job.platform not in PLATFORMS:
             return
         # What the download said about the login, not whether a pack came out: a pack of the
-        # files that arrived before Instagram asked for a login (incomplete) still means expired.
+        # files that arrived before the site asked for a login (incomplete) still means expired.
         login_failed = job.error_code if job.status == "error" else (job.result or {}).get("incomplete", "")
         if login_failed == "auth_required":
             state = "expired"
@@ -273,8 +279,11 @@ class JobStore:
             state = "ok"
         else:
             return
-        if job.updated >= self._cookies[1]:
-            self._cookies = (state, job.updated)
+        # The verdict counts from when the job was created, not when it ended: cookies that arrive
+        # while it runs (a new login after a login error) were not tried by it, so they stay
+        # "unknown" until the next download.
+        if job.created >= self._cookies.get(job.platform, ("unknown", 0.0))[1]:
+            self._cookies[job.platform] = (state, job.created)
 
     def problem(self) -> str:
         """Why jobs cannot be processed right now, or "" if they can (for the health check)."""
