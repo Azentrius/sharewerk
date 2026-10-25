@@ -262,8 +262,11 @@ def test_a_download_gets_only_the_lines_of_its_platform_from_the_hand_made_file(
         "#HttpOnly_.facebook.com\tTRUE\t/\tTRUE\t0\tc_user\tfromfile",
         ".facebook.com\tTRUE\t/\tTRUE\t0\txs\tfromfile",
     ]
-    instagram = for_download(s, "instagram", tmp_path / "instagram-job.txt").read_text(encoding="utf-8")
-    assert "instagram.com" in instagram and "facebook.com" not in instagram
+    instagram = for_download(s, "instagram", tmp_path / "instagram-job.txt").read_text(encoding="utf-8").splitlines()
+    assert instagram == [
+        "# Netscape HTTP Cookie File",
+        ".instagram.com\tTRUE\t/\tTRUE\t0\tsessionid\tfromfile",
+    ]
 
 
 def test_no_cookie_file_for_a_platform_without_cookies(settings, tmp_path):
@@ -290,7 +293,11 @@ def test_fetch_hands_the_tool_the_cookies_of_the_post_platform_and_removes_the_c
     monkeypatch.setattr(fetch_module, "run_gallery_dl", tool)
     fetch(FACEBOOK, tmp_path / "job", replace(settings, cookies_file=hand_made))
 
-    assert "c_user" in seen[0] and "instagram.com" not in seen[0]
+    assert seen[0].splitlines() == [
+        "# Netscape HTTP Cookie File",
+        "#HttpOnly_.facebook.com\tTRUE\t/\tTRUE\t0\tc_user\tfromfile",
+        ".facebook.com\tTRUE\t/\tTRUE\t0\txs\tfromfile",
+    ]
     assert not (tmp_path / "job" / "cookies.txt").exists()
 
 
