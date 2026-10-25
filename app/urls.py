@@ -79,10 +79,16 @@ def is_allowed(url: str, allowed_hosts: tuple[str, ...]) -> bool:
     return parts.scheme in {"http", "https"} and _host(url) in allowed_hosts
 
 
+def _on_domain(host: str, domain: str) -> bool:
+    """The domain itself or one of its subdomains, not a host that merely ends with its name
+    (evilinstagram.com)."""
+    return host == domain or host.endswith("." + domain)
+
+
 def platform_of(host: str) -> str:
-    if host.endswith("instagram.com") or host == "instagr.am":
+    if _on_domain(host, "instagram.com") or host == "instagr.am":
         return "instagram"
-    if host.endswith("facebook.com") or host in FB_SHORT_HOSTS:
+    if _on_domain(host, "facebook.com") or host in FB_SHORT_HOSTS:
         return "facebook"
     return "other"
 

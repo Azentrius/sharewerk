@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+On `main` since 0.1.1: cookies from a browser extension, the cookie state in the health check, packs
+from partial downloads, a pause between Instagram downloads, results that can be deleted right away,
+and an installed app that keeps working across updates.
+
+**Upgrading:** pull the new image. Instagram downloads now start at least 20 seconds apart
+(`SHAREWERK_INSTAGRAM_PAUSE`, `0` switches the pause off). The browser extension is optional; the
+cookie file keeps working.
+
+- **Browser extension for the cookies.** A Chrome extension (`extension/`, built by
+  `tools/build-extension.py`, attached to each release) sends the cookies of Instagram and Facebook
+  whenever you log in there, and only for the account you confirmed once in its menu. Sharewerk keeps
+  them in `/data/cookies/<platform>.txt` (mode 600); they take precedence over the cookie file and can
+  be deleted from the extension's settings page. New API, behind the login: `GET /api/cookies`, and
+  `PUT` and `DELETE /api/cookies/<platform>`, which also need the header `X-Sharewerk-Client`.
+- **Cookies per platform.** Each download gets only the cookies of its own platform; before, a
+  Facebook download got the Instagram cookies too.
+- **Cookie state in the health check.** `/healthz` adds `"cookies"` (what the last Instagram download
+  found: `ok`, `expired`, `missing` or `unknown`) and `"cookie_states"` with the same for every
+  platform. It never turns the check red; a keyword monitor on `"cookies":"expired"` warns when the
+  cookies run out. After a restart the state comes from the jobs still kept.
+- **Packs from partial downloads.** When gallery-dl and yt-dlp both stop with an error after some
+  files, the bigger part becomes a pack marked “This pack is incomplete”, with a line in `post.txt`
+  and a button to prepare the post again. In 0.1.1 such a download counted as failed.
+- **Pause between Instagram downloads.** New setting `SHAREWERK_INSTAGRAM_PAUSE`, 20 seconds by
+  default between the starts of two Instagram downloads, so several shares in a row do not look like
+  a burst of requests from the account; the page says so while a post waits. Facebook posts never
+  wait.
+- **Delete a result right away.** A trash icon in “Recently prepared” (`DELETE /api/jobs/<id>`)
+  deletes a finished or failed result with its files instead of after `SHAREWERK_RETENTION_HOURS`. A
+  delete that stops halfway leaves a failed job that is never handed out again and can be deleted
+  again.
+- **Transcription progress.** The page shows how far the transcription is, in percent.
+- **Facebook login errors** get their own message, “Facebook asks for a login for this post”; the
+  Instagram one now reads “Instagram asks for a login”.
+- **Fix: the installed app did not start after an update.** The service worker of 0.1.1 served its
+  cached scripts to a newer page. Pages now load scripts and stylesheets with a content hash in the
+  URL, so page and scripts always fit together.
+- **Fix: a partial pack after a login error reported the cookies as fine.** The cookie state now
+  comes from the download, not from the pack.
+- **Hardening:** a host that only ends with `instagram.com` or `facebook.com`, such as
+  `evilinstagram.com`, no longer counts as Instagram or Facebook. The host allowlist already refused
+  such links.
+- **Docs:** the README and `SECURITY.md` describe the login cookie, the public health check and where
+  cookies are kept; `.env.example` lists every setting; NOTICE adds PyAV and its FFmpeg libraries; the
+  README has a trademark notice.
+
 ## 0.1.1 – 2026-10-20
 
 Fixes from a code review: shares no longer mix up posts, incomplete downloads count as failed, and a

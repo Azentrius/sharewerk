@@ -11,7 +11,7 @@ Report them privately through GitHub instead:
 Please include:
 
 - what is affected (link handling, downloads, processing, sign-in, the app in
-  the browser, the Docker image; version or commit),
+  the browser, the browser extension, the Docker image; version or commit),
 - steps to reproduce,
 - the impact you expect.
 
@@ -34,10 +34,19 @@ gallery-dl, yt-dlp and FFmpeg on what it gets. That is why:
   every hop is checked against the allowlist again;
 - the downloaders and FFmpeg run as separate programs with argument lists,
   never through a shell;
-- the cookie file is mounted read-only, copied per job, deleted after the
-  job and never logged;
-- with `SHAREWERK_AUTH_MODE=token` every page and API call needs the access
-  token (as a session cookie or bearer token), compared in constant time;
+- the cookie file is mounted read-only; cookies sent by the browser
+  extension are kept in the data volume (`/data/cookies/<platform>.txt`,
+  mode 600) until they are deleted or replaced; each download gets a copy
+  of its platform's cookies in the job's folder, deleted when the download
+  ends (if Sharewerk stops during a download, the copy stays until the job
+  is deleted); cookie values are never logged;
+- with `SHAREWERK_AUTH_MODE=token` every page and API call except
+  `/healthz`, `/login`, the manifest, the service worker, `/favicon.ico`
+  and `/static/` needs the access token, compared in constant time: as a bearer token, or
+  as the login cookie `sharewerk_session`. That cookie holds an HMAC-SHA256
+  of the token, the same on every device, and lasts 400 days; only a new
+  token revokes it, on all devices at once. `/healthz` shows the state of
+  the cookies per platform, never their values;
   `SHAREWERK_AUTH_MODE=none` is meant only behind an authenticating proxy
   whose port is the only way in;
 - files of a job are served only by their names in the job's manifest, from
@@ -56,8 +65,9 @@ Reports are particularly welcome for:
   (server-side request forgery), also through redirects or the downloaders,
 - shared text or post metadata that gets interpreted as a command, an
   option of a downloader or a path outside the job's folder,
-- the cookie file or the access token appearing in a log, a URL, a page, a
-  job's files or any other file,
+- cookies (from the cookie file or the extension), the access token or the
+  login cookie appearing in a log, a URL, a page, a job's files or any file
+  other than those described above,
 - ways around the access token or the sign-in, or open redirects,
 - one job reading or serving files of another job or of the server,
 - post content (captions, titles, transcripts) that the app renders as HTML

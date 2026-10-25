@@ -39,12 +39,17 @@ Icon "pending" (app/static/icons.js): PatternFly's own icon from @patternfly/rea
 
 The Docker image additionally contains the following software, each under its own license.
 Sharewerk runs the downloaders and FFmpeg as separate programs and does not modify them.
+faster-whisper reads audio through PyAV, whose wheels bring a second copy of the FFmpeg
+libraries, built by the PyAV project and loaded into the Python process.
 
   gallery-dl          GPL-2.0-only                     https://github.com/mikf/gallery-dl
   yt-dlp              Unlicense                        https://github.com/yt-dlp/yt-dlp
   FFmpeg (Debian)     GPL-2.0-or-later (Debian build)  https://ffmpeg.org, https://packages.debian.org/ffmpeg
   faster-whisper      MIT                              https://github.com/SYSTRAN/faster-whisper
   CTranslate2         MIT                              https://github.com/OpenNMT/CTranslate2
+  PyAV                BSD-3-Clause                     https://github.com/PyAV-Org/PyAV
+  FFmpeg (PyAV wheel) LGPL-3.0-or-later build, linked  https://github.com/PyAV-Org/pyav-ffmpeg
+                      with x264 and x265 (GPL-2.0-or-later) and other codec libraries
   FastAPI             MIT                              https://github.com/fastapi/fastapi
   Uvicorn             BSD-3-Clause                     https://github.com/encode/uvicorn
   HTTPX               BSD-3-Clause                     https://github.com/encode/httpx
@@ -57,5 +62,5 @@ Sharewerk downloads them from Hugging Face on first use.
 The full license texts of the Python packages are in the image under
 /usr/local/lib/python3.13/site-packages/*/, those of the Debian packages under
 /usr/share/doc/*/copyright. The source code of the GPL components is available from the links
-above; for the exact versions in an image, run `pip show gallery-dl` or `dpkg -l ffmpeg` in the
+above; for the exact versions in an image, run `pip show gallery-dl av` or `dpkg -l ffmpeg` in the
 container.
