@@ -164,17 +164,41 @@ FACEBOOK_POST = Target(
 )
 
 
-def test_a_facebook_photo_post_reaches_gallery_dl_as_a_post_link(tools, tmp_path, settings):
-    # yt-dlp finds no video in a post with a picture. gallery-dl reads story.php as a profile
-    # named "story.php" and fails; as <id>/posts/<story_fbid> it gets the post's own pictures.
-    tools.set("yt-dlp", exit=1, stderr="ERROR: [facebook] 1128847296531599: No video formats found!\n")
+def test_a_facebook_post_goes_to_gallery_dl_first_as_a_post_link(tools, tmp_path, settings):
+    # gallery-dl gets the post's own pictures. yt-dlp, asked first, once took a short video from
+    # the page of a post with a picture, and the pack had that video instead of the picture.
     tools.set("gallery-dl", files=1)
+    tools.set("yt-dlp", files=1)  # would find "a video" on the page
     result = fetch(FACEBOOK_POST, tmp_path / "job", settings)
-    assert (result.tool, len(result.items)) == ("gallery-dl", 1)
+    assert (result.tool, len(result.items), result.items[0].kind) == ("gallery-dl", 1, "image")
     calls = tools.calls()
-    assert [c["tool"] for c in calls] == ["yt-dlp", "gallery-dl"]
-    assert calls[0]["args"][-1] == FACEBOOK_POST.url  # yt-dlp keeps the link that works for videos
-    assert calls[1]["args"][-1] == "https://www.facebook.com/100082190168714/posts/1128847296531599"
+    assert [c["tool"] for c in calls] == ["gallery-dl"]
+    # gallery-dl reads story.php as a profile named "story.php"; <id>/posts/<story_fbid> is the post.
+    assert calls[0]["args"][-1] == "https://www.facebook.com/100082190168714/posts/1128847296531599"
+
+
+def test_a_facebook_post_without_pictures_falls_back_to_yt_dlp(tools, tmp_path, settings):
+    # A post with a video only: gallery-dl finds nothing, yt-dlp gets the original link.
+    tools.set("gallery-dl", exit=4, stderr="[facebook][error] KeyError: 'fbid'\n")
+    tools.set("yt-dlp", files=1)
+    result = fetch(FACEBOOK_POST, tmp_path / "job", settings)
+    assert (result.tool, len(result.items)) == ("yt-dlp", 1)
+    calls = tools.calls()
+    assert [c["tool"] for c in calls] == ["gallery-dl", "yt-dlp"]
+    assert calls[1]["args"][-1] == FACEBOOK_POST.url
+
+
+@pytest.mark.parametrize("url", [
+    "https://www.facebook.com/reel/954162721072206/",
+    "https://www.facebook.com/watch/?v=954162721072206",
+    "https://www.facebook.com/examplepage/videos/954162721072206/",
+])
+def test_facebook_reels_and_videos_still_go_to_yt_dlp_first(url, tools, tmp_path, settings):
+    tools.set("yt-dlp", files=1)
+    tools.set("gallery-dl", files=1)
+    result = fetch(Target(url, "facebook", "reel", "954162721072206"), tmp_path / "job", settings)
+    assert result.tool == "yt-dlp"
+    assert [c["tool"] for c in tools.calls()] == ["yt-dlp"]
 
 
 @pytest.mark.parametrize("url,expected", [

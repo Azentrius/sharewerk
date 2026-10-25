@@ -45,6 +45,10 @@ cookie file keeps working.
   gallery-dl took for a profile and failed on, after yt-dlp found no video in it. gallery-dl now gets
   such a post (and a `permalink.php` link) as `<id>/posts/<story_fbid>` and downloads the post's own
   pictures; yt-dlp keeps the original link for videos.
+- **Fix: a Facebook post could come back as an unrelated short video.** yt-dlp, which went first for
+  every Facebook link, sometimes took a video from the page of a post with a picture. For Facebook
+  posts gallery-dl now goes first, as for Instagram, and yt-dlp only when gallery-dl finds nothing;
+  reels and videos still go to yt-dlp first.
 - **Hardening:** a host that only ends with `instagram.com` or `facebook.com`, such as
   `evilinstagram.com`, no longer counts as Instagram or Facebook. The host allowlist already refused
   such links.
