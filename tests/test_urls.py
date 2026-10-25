@@ -10,6 +10,7 @@ from app.urls import (
     extract_url,
     needs_resolving,
     normalise,
+    platform_of,
     resolve_headers,
     resolve_redirects,
     target_from_shared,
@@ -60,6 +61,35 @@ def test_lookalike_host_rejected():
     with pytest.raises(UrlError) as exc:
         target("https://instagram.com.evil.example/p/abc/")
     assert exc.value.code == "host_not_allowed"
+
+
+@pytest.mark.parametrize(
+    ("host", "platform"),
+    [
+        ("instagram.com", "instagram"),
+        ("www.instagram.com", "instagram"),
+        ("m.instagram.com", "instagram"),
+        ("instagr.am", "instagram"),
+        ("facebook.com", "facebook"),
+        ("web.facebook.com", "facebook"),
+        ("fb.watch", "facebook"),
+        ("evilinstagram.com", "other"),
+        ("notfacebook.com", "other"),
+        ("instagram.com.evil.example", "other"),
+        ("facebook.com.evil.example", "other"),
+    ],
+)
+def test_platform_is_the_domain_or_a_subdomain_only(host, platform):
+    assert platform_of(host) == platform
+
+
+def test_lookalike_host_is_no_platform_even_on_the_allowlist():
+    hosts = (*DEFAULT_ALLOWED_HOSTS, "evilinstagram.com", "evilfacebook.com")
+    for url in ("https://evilinstagram.com/p/abc/", "https://evilfacebook.com/reel/123/"):
+        with pytest.raises(UrlError) as exc:
+            normalise(url, hosts)
+        assert exc.value.code == "host_not_allowed"
+    assert not needs_resolving("https://evilfacebook.com/share/r/abc/")
 
 
 def test_internal_address_rejected():

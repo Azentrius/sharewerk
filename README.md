@@ -2,7 +2,7 @@
 
 # Sharewerk
 
-**Share an Instagram or Facebook post from your Android phone and get it back as a clean, share-ready pack:** every carousel image in full quality, key frames and a transcript for videos, and the caption as text. Then pass it straight on to an AI chat app, a messenger or anywhere else in the share menu.
+**Share an Instagram or Facebook post from your Android phone and get it back as a clean, share-ready pack:** every carousel image as a JPEG (long edge at most 1568 px, quality 85), key frames and a transcript for videos, and the caption as text. Then pass it straight on to an AI chat app, a messenger or anywhere else in the share menu.
 
 No more screenshots of every slide, no more screen recordings.
 
@@ -29,7 +29,7 @@ What you get for a post:
 
 | Post contains | Pack contains |
 |---|---|
-| Image carousel | Every image as JPEG (long edge 1568 px, sharp enough to read text, small enough to share fast) |
+| Image carousel | Every image as JPEG (long edge at most 1568 px, quality 85: sharp enough to read text, small enough to share fast) |
 | Video / reel | Key frames at scene changes plus a timestamped transcript |
 | Anything | A `post.txt` with source, author, date, caption and an index of all pictures |
 
@@ -105,7 +105,7 @@ sudo install -o 10001 -g 10001 -m 600 cookies.txt secrets/cookies.txt
 shred -u cookies.txt
 ```
 
-Delete the exported file on your computer as well. Cookies expire after a while, or sooner when Instagram gets suspicious. When Sharewerk reports "login required", export them again.
+Delete the exported file on your computer as well. Cookies expire after a while, or sooner when Instagram gets suspicious. When Sharewerk reports "Instagram asks for a login", export them again.
 
 ## Install on Android
 
@@ -147,6 +147,8 @@ routes:
             - email:
                 is: you@example.com
 ```
+
+Here Pomerium runs on another machine and reaches Sharewerk at the private address `10.0.0.5`, but `compose.yaml` binds the port to `127.0.0.1` only: change the binding to that private address (never a public one, see the comment in `compose.yaml`), or use `http://127.0.0.1:8080` when Pomerium runs on the same machine.
 
 Sharewerk answers `GET /healthz` with `{"ok":true,"cookies":"ok","cookie_states":{"instagram":"ok","facebook":"missing"}}`. Pomerium, however, answers `/healthz` and `/ping` itself, so a monitor on those paths only shows that Pomerium is up. The first route passes `/health` to Sharewerk's `/healthz` without a login; point your monitor there and check for `"ok":true`. Everything else stays behind the policy. Keep the public route first, because Pomerium uses the first route that matches. The longer `timeout` gives large files time to download over a slow connection; Pomerium's default is 30 seconds.
 
@@ -200,27 +202,30 @@ All settings are environment variables in `.env`. `.env.example` documents each 
 
 - The downloaders only ever receive URLs on an allowlist of Instagram and Facebook hosts (`SHAREWERK_ALLOWED_HOSTS`). This prevents the server from being used to fetch arbitrary or internal addresses.
 - Never run Sharewerk as an open service for other people. The cookies are yours, and so is the responsibility for what is downloaded with them.
+- With `SHAREWERK_AUTH_MODE=token`, a device that entered the token keeps the login cookie `sharewerk_session` for 400 days (HttpOnly, SameSite=Lax, Secure unless `SHAREWERK_COOKIE_SECURE=false`). Its value is an HMAC-SHA256 of the token, the same on every device, not a session the server could end: `POST /logout` deletes it in that browser only, and the only way to lock out a lost device is a new `SHAREWERK_AUTH_TOKEN`, which signs out every device. Requests can also send the token itself as `Authorization: Bearer <token>`.
+- `/healthz` answers without a login, also in token mode (as do `/login`, `/manifest.webmanifest`, `/sw.js`, `/favicon.ico` and `/static/`). It shows whether posts can be processed and the state of the Instagram and Facebook cookies (`ok`, `expired`, `missing`, `unknown`), never their values.
 - Only the browser extension sends cookies (`PUT /api/cookies/<platform>`), with your login at Sharewerk and a header that a web page cannot add to a request to another site, so no other site can plant cookies through your browser. Sharewerk takes only cookies of the platform's own domain and refuses anything that could break the cookie file. Keep `/api/cookies` behind your proxy's policy, like everything except `/health`.
+- Where the Instagram and Facebook cookies are: the cookie file in `secrets/`, mounted read-only; the cookies sent by the extension in the data volume (`/data/cookies/<platform>.txt`, mode 600) until you delete them in its settings page or new ones replace them; and, for each download, a copy of the post's platform's cookies in the job's folder (`/data/jobs/<id>/cookies.txt`, mode 600), because gallery-dl and yt-dlp write back into the file they get. Sharewerk deletes that copy when the download ends, also after an error. If Sharewerk stops in the middle of a download (restart, crash), the copy stays until the job is deleted: after `SHAREWERK_RETENTION_HOURS`, or with the trash icon.
 - The container runs as a non-root user with a read-only root filesystem and no Linux capabilities.
 - Results are deleted after `SHAREWERK_RETENTION_HOURS`, or right away with the trash icon in "Recently prepared" (`DELETE /api/jobs/<id>`; a post that is still being prepared cannot be deleted).
 
 ## Legal
 
-Sharewerk is a tool for personal use: it saves you from taking screenshots of posts you can already see. Automated access to Instagram and Facebook is against Meta's terms of use, and the content of a post belongs to its author. You are responsible for how you use it. This project is not affiliated with or endorsed by Meta Platforms. Instagram, Facebook and the other app names in this README are trademarks of their respective owners.
+Sharewerk is a tool for personal use: it saves you from taking screenshots of posts you can already see. Automated access to Instagram and Facebook is against Meta's terms of use, and the content of a post belongs to its author. You are responsible for how you use it. Passing a post on to other apps, such as AI chat apps or messengers, hands its content to these services and their providers; whether you may do that depends on the author's rights and on the terms of these services. The only cookie Sharewerk sets is its own login cookie in token mode (`sharewerk_session`), which only keeps a device signed in and is not used for tracking. This project is not affiliated with or endorsed by Meta Platforms. Instagram, Facebook and the other app names in this README are trademarks of their respective owners.
 
 ## Troubleshooting
 
 | Message | Usual cause | Fix |
 |---|---|---|
-| Login required, or `"cookies":"expired"` in `/healthz` | Cookies missing or expired | Log in to Instagram again in the extension's browser profile, or export new cookies; the state turns `unknown` as soon as new cookies arrive, `ok` after the next Instagram download |
-| Download failed | Downloader outdated | Pull or rebuild the image |
+| Instagram asks for a login, or `"cookies":"expired"` in `/healthz` | Cookies missing or expired | Log in to Instagram again in the extension's browser profile, or export new cookies; the state turns `unknown` as soon as new cookies arrive, `ok` after the next Instagram download |
+| The post could not be downloaded | Downloader outdated | Pull or rebuild the image |
 | Facebook asks for a login for this post | The post is visible to logged-in accounts only; Sharewerk has no (valid) Facebook cookies | Log in to a secondary Facebook account in the extension's browser profile, or export its cookies as well |
 | The extension's icon shows `!`, "Sharewerk asks for a login" | No login at Sharewerk in that browser profile, or it expired | Open Sharewerk in that profile and sign in; the extension then sends by itself |
 | The extension's icon shows `?` | An account waits for your confirmation | Open the extension's menu; confirm with "Use account" only if it is the secondary account |
-| Too many requests | Rate limit on the account | Wait, then try again |
+| Too many requests to Instagram or Facebook | Rate limit on the account | Wait, then try again |
 | This pack is incomplete | The download stopped after some items, often at a rate limit; you get what arrived, and `post.txt` says so | Prepare the post again later for the rest |
 | Not in share menu | App not installed | Install from Chrome's menu |
-| Transcript says "music only" | No speech in the audio | Expected for music reels |
+| The transcript says "no speech detected; probably music only" | No speech in the audio | Expected for music reels |
 | The server could not save the post | Data volume full or read-only | Free up space, then prepare the post again |
 | `/healthz` answers 503 | `worker_stopped`: the job worker ended; `storage_failed`: job states cannot be saved | Check the logs and the data volume, restart Sharewerk |
 
@@ -233,8 +238,8 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 ruff check
 python -m pytest
-node --test tests/js/app.test.mjs tests/js/extension.test.mjs   # no npm packages needed
-SHAREWERK_AUTH_MODE=none SHAREWERK_DATA_DIR=./data SHAREWERK_COOKIE_SECURE=false python -m app.main
+node --test tests/js/app.test.mjs tests/js/pwa-update.test.mjs tests/js/extension.test.mjs   # no npm packages needed; pwa-update runs `python` (or $PYTHON) with the app's dependencies
+SHAREWERK_AUTH_MODE=none SHAREWERK_HOST=127.0.0.1 SHAREWERK_DATA_DIR=./data SHAREWERK_COOKIE_SECURE=false python -m app.main   # no login: this computer only
 python tools/build-extension.py   # the browser extension, in dist/
 ```
 
