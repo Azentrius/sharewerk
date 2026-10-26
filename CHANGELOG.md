@@ -1,14 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 – 2026-10-26
 
-On `main` since 0.1.1: cookies from a browser extension, the cookie state in the health check, packs
-from partial downloads, a pause between Instagram downloads, results that can be deleted right away,
-and an installed app that keeps working across updates.
+Cookies from a browser extension and per platform, the cookie state in the health check, Facebook
+posts with pictures, packs from partial downloads, a pause between Instagram downloads, results that
+can be deleted right away, and an installed app that keeps working across updates.
 
 **Upgrading:** pull the new image. Instagram downloads now start at least 20 seconds apart
 (`SHAREWERK_INSTAGRAM_PAUSE`, `0` switches the pause off). The browser extension is optional; the
-cookie file keeps working.
+cookie file keeps working. The extension is attached to this release as
+`sharewerk-extension-0.1.2.zip`.
 
 - **Browser extension for the cookies.** A Chrome extension (`extension/`, built by
   `tools/build-extension.py`, attached to each release) sends the cookies of Instagram and Facebook
