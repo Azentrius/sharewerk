@@ -13,8 +13,9 @@ Rules followed (design system, section "Android", "App-Symbol"):
   monochrome layer and in the notification icon
 - dot radius 4.120 dp, as in Lautwerk and Stellwerk
 
-Usage: python scripts/app-icon-sharewerk.py [OUTPUT_DIR [EXTENSION_DIR]]
-       (defaults: app/static/icons and extension/icons, the browser extension's icons)
+Usage: python scripts/app-icon-sharewerk.py [OUTPUT_DIR [EXTENSION_DIR [STORE_DIR]]]
+       (defaults: app/static/icons, extension/icons for the browser extension, and
+       docs/chrome-web-store for the store icon of its listing)
 Needs: pip install shapely pillow
 """
 
@@ -124,7 +125,7 @@ def raster(sign: MultiPolygon, size: int, view: tuple[float, float, float], *, b
     return img.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def main(out: Path, extension_out: Path) -> None:
+def main(out: Path, extension_out: Path, store_out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     sign = build_sign()
     info = check(sign)
@@ -156,10 +157,18 @@ def main(out: Path, extension_out: Path) -> None:
         )
     print(f"written to {extension_out}")
 
+    # Chrome Web Store: 128 px with the sign at 96 px and 16 px of transparent margin, as the store asks.
+    store_out.mkdir(parents=True, exist_ok=True)
+    store = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+    store.paste(raster(sign, 96, (18, 18, 72), background=BRAND_INK, radius_ratio=15.75 / 72), (16, 16))
+    store.save(store_out / "store-icon-128.png")
+    print(f"written to {store_out}")
+
 
 if __name__ == "__main__":
     root = Path(__file__).resolve().parent.parent
     main(
         Path(sys.argv[1]) if len(sys.argv) > 1 else root / "app" / "static" / "icons",
         Path(sys.argv[2]) if len(sys.argv) > 2 else root / "extension" / "icons",
+        Path(sys.argv[3]) if len(sys.argv) > 3 else root / "docs" / "chrome-web-store",
     )

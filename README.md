@@ -91,7 +91,7 @@ The extension in `extension/` sends the cookies of Instagram and Facebook to you
 
 The icon shows `?` while an account waits for your confirmation and `!` when the cookies cannot reach Sharewerk (no address, no login at Sharewerk, server unreachable or an error); the menu says which and what to do. When the login at your proxy expires (Pomerium: `cookie_expire`), the extension waits until you sign in to Sharewerk again in that profile, then sends what waited.
 
-What the extension can do: read the cookies of instagram.com and facebook.com, and send them to the one address you entered. It runs no code on web pages and loads no code from the internet. Sharewerk keeps the cookies in the data volume (`/data/cookies/<platform>.txt`, readable by the container user only) and never writes their values to a log. In the settings page you can delete them from Sharewerk again; the extension then asks before it sends an account again.
+What the extension can do: read the cookies of instagram.com and facebook.com, and send them to the one address you entered. It runs no code on web pages and loads no code from the internet. Sharewerk keeps the cookies in the data volume (`/data/cookies/<platform>.txt`, readable by the container user only) and never writes their values to a log. In the settings page you can delete them from Sharewerk again; the extension then asks before it sends an account again. [PRIVACY.md](PRIVACY.md) sums up what the extension, the server and the app do with data.
 
 ### Cookie file by hand
 
@@ -241,6 +241,7 @@ python -m pytest
 node --test tests/js/app.test.mjs tests/js/pwa-update.test.mjs tests/js/extension.test.mjs   # no npm packages needed; pwa-update runs `python` (or $PYTHON) with the app's dependencies
 SHAREWERK_AUTH_MODE=none SHAREWERK_HOST=127.0.0.1 SHAREWERK_DATA_DIR=./data SHAREWERK_COOKIE_SECURE=false python -m app.main   # no login: this computer only
 python tools/build-extension.py   # the browser extension, in dist/
+python tools/store-images.py      # its Chrome Web Store images (needs Chrome or Edge), see docs/chrome-web-store.md
 ```
 
 Install the secret-scanning pre-commit hook once: `pipx install pre-commit && pre-commit install`.
