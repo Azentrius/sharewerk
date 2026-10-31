@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# CI only: deploy/Caddyfile with a local certificate (tls internal), so no Let's Encrypt is needed.
+{$SHAREWERK_DOMAIN} {
+	tls internal
+	reverse_proxy sharewerk:8080
+}

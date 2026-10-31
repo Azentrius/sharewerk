@@ -68,6 +68,22 @@ jobs:
             ffmpeg -hide_banner -loglevel error -f lavfi -i sine=frequency=440:duration=1 -ac 1 -ar 16000 /tmp/tone.wav
             python -c "from faster_whisper.audio import decode_audio; print(len(decode_audio(\"/tmp/tone.wav\")), \"samples decoded\")"
           '
+      - name: Own server with Caddy (setup.sh, compose.caddy.yaml) answers over HTTPS
+        run: |
+          ./setup.sh --domain sharewerk.test --no-start
+          compose() { docker compose -f compose.yaml -f compose.caddy.yaml -f tests/ci/compose.ci.yaml "$@"; }
+          trap 'compose logs --no-color | tail -n 60; compose down -v' EXIT
+          compose up -d --wait --wait-timeout 180
+          get() { curl -sS --retry 10 --retry-delay 2 --retry-all-errors --insecure --resolve "sharewerk.test:$1:127.0.0.1" "${@:2}"; }
+          get 443 https://sharewerk.test/healthz | grep -F '"ok":true'
+          test "$(get 443 -o /dev/null -w '%{http_code}' https://sharewerk.test/)" = 303      # to the token login
+          test "$(get 80 -o /dev/null -w '%{http_code}' http://sharewerk.test/)" = 308        # plain HTTP to HTTPS
+      - name: At home with Tailscale (compose.tailscale.yaml) is a valid Compose setup
+        run: |
+          export TS_AUTHKEY=tskey-auth-ci
+          docker compose -f compose.yaml -f compose.tailscale.yaml config --quiet
+          docker compose -f compose.yaml -f compose.tailscale.yaml config | grep -F 'network_mode: service:tailscale'
+          ! docker compose -f compose.yaml -f compose.tailscale.yaml config --format json | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)["services"]["sharewerk"].get("ports") else 1)'
 
   image:
     needs: test

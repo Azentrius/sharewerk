@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# CI only, on top of compose.yaml and compose.caddy.yaml: the image built in this run, and Caddy with
+# a certificate of its own local authority instead of one from Let's Encrypt.
+services:
+  sharewerk:
+    image: sharewerk:test
+    pull_policy: never
+  caddy:
+    volumes:
+      - ./tests/ci/Caddyfile:/etc/caddy/Caddyfile:ro
