@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# Sharewerk on its own server with a domain. Caddy in front of it gets the HTTPS certificate from
+# Let's Encrypt by itself and renews it. Needs SHAREWERK_DOMAIN in .env, a DNS record of that
+# domain pointing to this server, and the ports 80 and 443 open.
+#
+# setup.sh --domain <name> writes .env with COMPOSE_FILE=compose.yaml:compose.caddy.yaml, so plain
+# "docker compose up -d" and "docker compose pull" include this file. See docs/getting-started.md.
+services:
+  caddy:
+    image: caddy:2
+    container_name: sharewerk-caddy
+    restart: unless-stopped
+    depends_on:
+      - sharewerk
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SHAREWERK_DOMAIN: ${SHAREWERK_DOMAIN:?set SHAREWERK_DOMAIN in .env, e.g. with ./setup.sh --domain}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificates: keep them, Let's Encrypt limits new ones per week
+      - caddy-config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -5,7 +5,8 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 The Sharewerk sign (app/static/icons/ and extension/icons/, built by scripts/app-icon-sharewerk.py),
 two stacked cards with an arrow and the dot of the Azentrius word mark, is a mark of Azentrius, as
 are the names Azentrius and Sharewerk. They are not licensed under the Apache License; all rights
-reserved.
+reserved. You may run your own Sharewerk, unmodified or with your own settings, under its name and
+with its sign; a changed version needs another name and sign (README, section "License").
 
 This project includes third-party material under its own license (texts in LICENSES/). The browser
 extension (extension/, built by tools/build-extension.py) ships the same files, copied unchanged

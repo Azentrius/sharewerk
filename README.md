@@ -39,12 +39,27 @@ Android allows at most 10 files per share. If a post has more pictures than fit,
 
 ## Requirements
 
-- A server with Docker and Docker Compose (2 CPU cores and 3 GB RAM are plenty)
-- A domain with HTTPS in front of it (PWAs only install from secure origins)
-- An Android phone with Chrome
+- A Linux machine with Docker that runs all the time: a small server, or a computer at home (2 CPU cores and 4 GB RAM are plenty)
+- HTTPS in front of it (PWAs only install from secure origins): a domain, or Tailscale
+- An Android phone with Chrome, and Chrome on a computer for the browser extension
 - For Instagram: a **secondary** Instagram account (see [Cookies](#cookies))
 
 ## Quick start
+
+**[docs/getting-started.md](docs/getting-started.md) walks you through it step by step**, no Docker or web server knowledge needed. `setup.sh` does the work for one of two ways:
+
+```bash
+git clone https://github.com/Azentrius/sharewerk.git
+cd sharewerk
+./setup.sh --domain sharewerk.example.com   # own server: Caddy gets the HTTPS certificate itself
+./setup.sh --tailscale tskey-auth-...       # or at home: reachable in your tailnet only
+```
+
+It writes `.env` with a new access token and `COMPOSE_FILE` (so plain `docker compose` commands include `compose.caddy.yaml` or `compose.tailscale.yaml`), creates `secrets/`, starts Sharewerk and shows the address and the token.
+
+### With your own reverse proxy
+
+Without `setup.sh`:
 
 ```bash
 git clone https://github.com/Azentrius/sharewerk.git
@@ -247,7 +262,7 @@ Install the secret-scanning pre-commit hook once: `pipx install pre-commit && pr
 
 Changes are listed in [CHANGELOG.md](CHANGELOG.md); the version lives in `app/__init__.py`. Releases are made by the `release` workflow from `main`.
 
-Code layout: `app/urls.py` (link validation), `app/fetch.py` (downloaders), `app/cookies.py` (cookies per platform), `app/process.py` (images, frames, contact sheets, text), `app/transcribe.py` (Whisper), `app/jobs.py` (queue), `app/main.py` (HTTP), `app/static/` (PWA), `app/static/azentrius/` (design system, copied unchanged), `extension/` (browser extension; `tools/build-extension.py` adds the design system, `theme.js`, `icons.js` and the license texts from the app).
+Code layout: `app/urls.py` (link validation), `app/fetch.py` (downloaders), `app/cookies.py` (cookies per platform), `app/process.py` (images, frames, contact sheets, text), `app/transcribe.py` (Whisper), `app/jobs.py` (queue), `app/main.py` (HTTP), `app/static/` (PWA), `app/static/azentrius/` (design system, copied unchanged), `extension/` (browser extension; `tools/build-extension.py` adds the design system, `theme.js`, `icons.js` and the license texts from the app), `setup.sh` with `compose.caddy.yaml`, `compose.tailscale.yaml` and `deploy/` (the two ways of [docs/getting-started.md](docs/getting-started.md); CI starts the Caddy way with a local certificate, `tests/ci/`).
 
 ## Design
 
@@ -256,6 +271,8 @@ The interface follows the Azentrius Design System, theme "Azentrius hell" or "Az
 ## License
 
 Sharewerk is licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE). Not covered by it: the Azentrius brand, i.e. the wordmark "Azentrius.", its signs and the product names, including "Sharewerk" and the Sharewerk sign (all rights reserved).
+
+**The name and the sign.** You may run your own Sharewerk, unmodified or with your own settings, under its name and with its sign, without asking. Please keep the footer with the name and the link to the source code. If you change the code and run or publish the changed version, give it another name and sign, so nobody takes it for Sharewerk; you may say that it is based on Sharewerk.
 
 Bundled with their own licenses (texts in [LICENSES/](LICENSES/)): the design system's CSS (Apache-2.0), the fonts DM Sans, DM Serif Display and Red Hat Mono (SIL OFL 1.1), and the icons (Font Awesome Free 5 under CC BY 4.0, one PatternFly icon under MIT). The Docker image additionally contains GPL-licensed gallery-dl and FFmpeg; see [NOTICE](NOTICE).
 

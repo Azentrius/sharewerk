@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# Sharewerk at home, reachable only in your tailnet: Tailscale gives it the address
+# https://sharewerk.<your-tailnet>.ts.net with a valid certificate. No domain, no open port. Needs
+# TS_AUTHKEY in .env, MagicDNS and HTTPS certificates switched on in the Tailscale admin console,
+# and the Tailscale app on the phone.
+#
+# setup.sh --tailscale <auth key> writes .env with COMPOSE_FILE=compose.yaml:compose.tailscale.yaml,
+# so plain "docker compose up -d" and "docker compose pull" include this file. See
+# docs/getting-started.md.
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: sharewerk-tailscale
+    hostname: ${TS_HOSTNAME:-sharewerk}
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?set TS_AUTHKEY in .env, e.g. with ./setup.sh --tailscale}
+      TS_HOSTNAME: ${TS_HOSTNAME:-sharewerk}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    volumes:
+      - tailscale-state:/var/lib/tailscale # the machine's login; keep it
+      - ./deploy/tailscale-serve.json:/config/serve.json:ro
+
+  sharewerk:
+    # Sharewerk joins the network of the Tailscale container: Tailscale serves it on
+    # https://<name>.ts.net and passes requests to 127.0.0.1:8080. No port on the host.
+    network_mode: service:tailscale
+    ports: !reset []
+    depends_on:
+      - tailscale
+
+volumes:
+  tailscale-state:
